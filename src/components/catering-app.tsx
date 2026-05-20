@@ -2526,6 +2526,9 @@ function EventsSection({
         true,
       )
     : [];
+  const detailWhatsappUrl = detailEvent
+    ? getEventNeedsWhatsappUrl(detailEvent, detailNeeds)
+    : "#";
   const selectedProductIds = new Set(
     detailNeeds.map((need) => need.product.id),
   );
@@ -2736,16 +2739,6 @@ function EventsSection({
     }
 
     onStatusChange(event.id, "finalizado");
-  }
-
-  function handleShareEventNeeds(event: CateringEvent) {
-    const needs = getEventOperationalNeeds(
-      event,
-      products,
-      eventProductPlanLog[event.id],
-    );
-
-    shareEventNeedsOnWhatsapp(event, needs);
   }
 
   function updateDraftProductPlan(need: EventNeed, value: string) {
@@ -3216,14 +3209,15 @@ function EventsSection({
                       subtitle="Editá cantidades, extras y retornos"
                     />
                     <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
-                      <button
-                        type="button"
-                        onClick={() => handleShareEventNeeds(detailEvent)}
+                      <a
+                        href={detailWhatsappUrl}
+                        target="_blank"
+                        rel="noopener noreferrer"
                         className="inline-flex h-11 items-center justify-center gap-2 rounded-[8px] border border-zinc-200 bg-white px-4 text-sm font-semibold text-zinc-700 transition hover:border-zinc-400 hover:text-zinc-950"
                       >
                         <WhatsAppIcon className="h-4 w-4" />
                         WhatsApp
-                      </button>
+                      </a>
                       <div className="relative">
                         <button
                           type="button"
@@ -4555,15 +4549,7 @@ function exportEventToCalendar(event: CateringEvent) {
   window.open(calendarUrl.toString(), "_blank", "noopener,noreferrer");
 }
 
-function openExternalUrl(url: string) {
-  const openedWindow = window.open(url, "_blank", "noopener,noreferrer");
-
-  if (openedWindow) {
-    openedWindow.opener = null;
-  }
-}
-
-function shareEventNeedsOnWhatsapp(event: CateringEvent, needs: EventNeed[]) {
+function getEventNeedsWhatsappUrl(event: CateringEvent, needs: EventNeed[]) {
   const icons = {
     box: String.fromCodePoint(0x1f4e6),
     calendar: String.fromCodePoint(0x1f4c5),
@@ -4606,7 +4592,7 @@ function shareEventNeedsOnWhatsapp(event: CateringEvent, needs: EventNeed[]) {
     message,
   )}`;
 
-  openExternalUrl(whatsappUrl);
+  return whatsappUrl;
 }
 
 function formatCalendarDate(value: string): string {
