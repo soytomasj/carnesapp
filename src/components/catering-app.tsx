@@ -4564,12 +4564,6 @@ function openExternalUrl(url: string) {
 }
 
 function shareEventNeedsOnWhatsapp(event: CateringEvent, needs: EventNeed[]) {
-  const icons = {
-    box: String.fromCodePoint(0x1f4e6),
-    calendar: String.fromCodePoint(0x1f4c5),
-    fire: String.fromCodePoint(0x1f525),
-    people: String.fromCodePoint(0x1f465),
-  };
   const sortedNeeds = [...needs]
     .filter((need) => need.total > 0 && isVisibleProduct(need.product))
     .sort((first, second) => second.total - first.total);
@@ -4586,16 +4580,14 @@ function shareEventNeedsOnWhatsapp(event: CateringEvent, needs: EventNeed[]) {
           .join("\n")
       : "Sin necesidades cargadas.";
   const message = [
-    `${icons.fire} *Necesidades para ${formatEventNameDisplay(
-      event.name,
-    )}*`,
+    `*Necesidades para ${formatEventNameDisplay(event.name)}*`,
     "",
-    `${icons.calendar} *Fecha:* ${formatEventDate(event.date)}`,
-    `${icons.people} *Personas:* ${event.people}`,
+    `*Fecha:* ${formatEventDate(event.date)}`,
+    `*Personas:* ${event.people}`,
     `*Servicio:* ${serviceTypeCopy[event.serviceType]}`,
     event.manager ? `*Encargado:* ${formatPersonName(event.manager)}` : "",
     "",
-    `${icons.box} *Lista a preparar:*`,
+    "*Lista a preparar:*",
     needsText,
     "",
     "Confirmame si ajustamos alguna cantidad.",
