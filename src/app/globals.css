@@ -1,8 +1,8 @@
 @import "tailwindcss";
 
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  --background: #f4f5f7;
+  --foreground: #18181b;
 }
 
 @theme inline {
@@ -12,15 +12,234 @@
   --font-mono: var(--font-geist-mono);
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
-}
-
 body {
   background: var(--background);
   color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  font-family: var(--font-geist-sans), Arial, Helvetica, sans-serif;
+}
+
+button,
+input,
+select,
+textarea {
+  font: inherit;
+}
+
+button,
+a,
+[role="button"] {
+  transition:
+    background-color 160ms ease,
+    border-color 160ms ease,
+    color 160ms ease,
+    box-shadow 180ms ease,
+    transform 160ms ease;
+}
+
+button:not(:disabled):active,
+[role="button"]:not(:disabled):active {
+  transform: translateY(1px) scale(0.99);
+}
+
+.app-section-enter {
+  animation: app-section-enter 280ms ease both;
+}
+
+.app-card-enter {
+  animation: app-card-enter 260ms ease both;
+}
+
+.app-feedback-toast {
+  animation: app-feedback-toast 1900ms ease both;
+}
+
+.app-modal-backdrop {
+  animation: app-fade-in 180ms ease both;
+}
+
+.app-modal-panel {
+  animation: app-modal-panel 220ms ease both;
+}
+
+.app-slide-panel {
+  animation: app-slide-panel 240ms ease both;
+}
+
+.app-popover {
+  transform-origin: top right;
+  animation: app-popover 160ms ease both;
+}
+
+.app-table-row {
+  transition:
+    background-color 150ms ease,
+    box-shadow 160ms ease,
+    transform 160ms ease;
+}
+
+.app-table-row:hover {
+  transform: translateY(-1px);
+}
+
+.field-control {
+  height: 2.75rem;
+  width: 100%;
+  border-radius: 12px;
+  border: 1px solid rgb(228 228 231);
+  background: white;
+  padding: 0 0.75rem;
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: rgb(24 24 27);
+  outline: none;
+  appearance: none;
+  -webkit-appearance: none;
+  transition:
+    border-color 150ms ease,
+    box-shadow 150ms ease;
+}
+
+select.field-control {
+  border-radius: 12px;
+}
+
+.field-control::placeholder {
+  color: rgb(161 161 170);
+  font-weight: 500;
+}
+
+.field-control:focus {
+  border-color: rgb(82 82 91);
+  box-shadow: 0 0 0 3px rgba(82, 82, 91, 0.08);
+}
+
+.notes-textarea {
+  min-height: 7.5rem;
+  height: auto;
+  resize: vertical;
+  padding: 1.05rem 1.25rem;
+  line-height: 1.55;
+  font-weight: 500;
+}
+
+.notes-textarea::placeholder {
+  color: rgb(161 161 170);
+  font-weight: 500;
+}
+
+.brand-fire-shell {
+  display: flex;
+  height: 2.75rem;
+  width: 2.75rem;
+  flex-shrink: 0;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  border-radius: 12px;
+  background: linear-gradient(145deg, #43130f 0%, #8d2f29 100%);
+  box-shadow:
+    0 12px 22px rgba(143, 47, 43, 0.2),
+    inset 0 0 0 1px rgba(255, 255, 255, 0.16),
+    inset 0 -10px 16px rgba(55, 12, 10, 0.24);
+}
+
+@keyframes app-fade-in {
+  from {
+    opacity: 0;
+  }
+
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes app-section-enter {
+  from {
+    opacity: 0;
+  }
+
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes app-card-enter {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes app-feedback-toast {
+  0% {
+    opacity: 0;
+    transform: translateY(-4px) scale(0.985);
+  }
+
+  10%,
+  82% {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+
+  100% {
+    opacity: 0;
+    transform: translateY(-3px) scale(0.99);
+  }
+}
+
+@keyframes app-modal-panel {
+  from {
+    opacity: 0;
+    transform: translateY(10px) scale(0.985);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+@keyframes app-slide-panel {
+  from {
+    opacity: 0;
+    transform: translateX(10px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+@keyframes app-popover {
+  from {
+    opacity: 0;
+    transform: translateY(-4px) scale(0.98);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 1ms !important;
+    animation-iteration-count: 1 !important;
+    scroll-behavior: auto !important;
+    transition-duration: 1ms !important;
+  }
+}
+
+.rounded-\[8px\] {
+  border-radius: 12px;
 }
