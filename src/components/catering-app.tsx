@@ -4555,6 +4555,17 @@ function exportEventToCalendar(event: CateringEvent) {
   window.open(calendarUrl.toString(), "_blank", "noopener,noreferrer");
 }
 
+function openExternalUrl(url: string) {
+  const openedWindow = window.open(url, "_blank");
+
+  if (openedWindow) {
+    openedWindow.opener = null;
+    return;
+  }
+
+  window.location.assign(url);
+}
+
 function shareEventNeedsOnWhatsapp(event: CateringEvent, needs: EventNeed[]) {
   const icons = {
     box: String.fromCodePoint(0x1f4e6),
@@ -4594,10 +4605,11 @@ function shareEventNeedsOnWhatsapp(event: CateringEvent, needs: EventNeed[]) {
   ]
     .filter((line) => line !== "")
     .join("\n");
-  const encodedMessage = encodeURIComponent(message);
-  const whatsappUrl = `https://web.whatsapp.com/send?text=${encodedMessage}`;
+  const whatsappUrl = new URL("https://wa.me/");
 
-  window.open(whatsappUrl, "_blank", "noopener,noreferrer");
+  whatsappUrl.searchParams.set("text", message);
+
+  openExternalUrl(whatsappUrl.toString());
 }
 
 function formatCalendarDate(value: string): string {
