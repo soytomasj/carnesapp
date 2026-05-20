@@ -4588,7 +4588,7 @@ function getEventNeedsWhatsappUrl(event: CateringEvent, needs: EventNeed[]) {
   ]
     .filter((line) => line !== "")
     .join("\n");
-  const whatsappUrl = `https://api.whatsapp.com/send?text=${encodeURIComponent(
+  const whatsappUrl = `/api/share-message?text=${encodeURIComponent(
     message,
   )}`;
 
