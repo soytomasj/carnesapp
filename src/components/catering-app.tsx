@@ -4556,14 +4556,11 @@ function exportEventToCalendar(event: CateringEvent) {
 }
 
 function openExternalUrl(url: string) {
-  const openedWindow = window.open(url, "_blank");
+  const openedWindow = window.open(url, "_blank", "noopener,noreferrer");
 
   if (openedWindow) {
     openedWindow.opener = null;
-    return;
   }
-
-  window.location.assign(url);
 }
 
 function shareEventNeedsOnWhatsapp(event: CateringEvent, needs: EventNeed[]) {
