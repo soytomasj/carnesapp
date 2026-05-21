@@ -3549,65 +3549,79 @@ function EventsSection({
                       </button>
                     </div>
                   </div>
-                  {isEditingKgPerPerson ? (
-                    <form
-                      onSubmit={(e) => {
-                        e.preventDefault();
-                        const parsed = parseAmountInput(kgPerPersonDraft);
-                        if (parsed > 0) {
-                          const defaultKg = getDefaultKgPerPerson(detailEvent.serviceType);
-                          onUpdateEventKgPerPerson(
-                            detailEvent.id,
-                            parsed === defaultKg ? undefined : parsed,
-                          );
-                        }
-                        setIsEditingKgPerPerson(false);
-                      }}
-                      className="mt-2 flex items-center gap-2"
-                    >
-                      <input
-                        type="text"
-                        inputMode="decimal"
-                        autoFocus
-                        value={kgPerPersonDraft}
-                        onChange={(event) =>
-                          setKgPerPersonDraft(
-                            normalizeAmountDraft(event.target.value),
-                          )
-                        }
-                        onKeyDown={(event) => {
-                          if (event.key === "Escape") {
-                            setIsEditingKgPerPerson(false);
+                  <div className="mt-2 flex h-9 items-center">
+                    {isEditingKgPerPerson ? (
+                      <form
+                        onSubmit={(e) => {
+                          e.preventDefault();
+                          const parsed = parseAmountInput(kgPerPersonDraft);
+                          if (parsed > 0) {
+                            const defaultKg = getDefaultKgPerPerson(detailEvent.serviceType);
+                            const newKg = parsed === defaultKg ? undefined : parsed;
+                            onUpdateEventKgPerPerson(detailEvent.id, newKg);
+                            const updatedEvent = { ...detailEvent, kgPerPerson: newKg };
+                            const newBaseNeeds = calculateEventNeeds(updatedEvent, products);
+                            const newBaseProductIds = new Set(newBaseNeeds.map((n) => n.product.id));
+                            setDraftProductPlan((currentPlan) => {
+                              const newPlan: typeof currentPlan = {};
+                              for (const need of newBaseNeeds) {
+                                newPlan[need.product.id] = {
+                                  removed: currentPlan[need.product.id]?.removed ?? false,
+                                  total: need.total,
+                                };
+                              }
+                              for (const [productId, entry] of Object.entries(currentPlan)) {
+                                if (!newBaseProductIds.has(productId)) {
+                                  newPlan[productId] = entry;
+                                }
+                              }
+                              return newPlan;
+                            });
                           }
+                          setIsEditingKgPerPerson(false);
                         }}
-                        className="h-9 min-w-0 flex-1 rounded-[8px] border border-zinc-200 bg-white px-3 text-lg font-bold text-zinc-950 outline-none transition focus:border-zinc-500"
-                      />
-                      <button
-                        type="submit"
-                        className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-[8px] bg-zinc-950 text-white transition hover:bg-zinc-800"
-                        aria-label="Guardar"
-                        title="Guardar"
+                        className="flex w-full items-center gap-2"
                       >
-                        <Save className="h-4 w-4" aria-hidden="true" />
-                      </button>
-                    </form>
-                  ) : (
-                    <p className="mt-2 text-2xl font-bold text-zinc-950">
-                      {formatAmount(
-                        detailEvent.kgPerPerson ??
-                          getDefaultKgPerPerson(detailEvent.serviceType),
-                        "kg",
-                      )}
-                    </p>
-                  )}
-                  <div className="mt-auto pt-3">
-                    {detailEvent.kgPerPerson != null ? (
-                      <span className="inline-flex items-center rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-amber-700">
-                        Personalizado
-                      </span>
+                        <input
+                          type="text"
+                          inputMode="decimal"
+                          autoFocus
+                          value={kgPerPersonDraft}
+                          onChange={(event) =>
+                            setKgPerPersonDraft(
+                              normalizeAmountDraft(event.target.value),
+                            )
+                          }
+                          onKeyDown={(event) => {
+                            if (event.key === "Escape") {
+                              setIsEditingKgPerPerson(false);
+                            }
+                          }}
+                          className="h-9 min-w-0 flex-1 rounded-[8px] border border-zinc-200 bg-white px-3 text-lg font-bold text-zinc-950 outline-none transition focus:border-zinc-500"
+                        />
+                        <button
+                          type="submit"
+                          className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-[8px] bg-zinc-950 text-white transition hover:bg-zinc-800"
+                          aria-label="Guardar"
+                          title="Guardar"
+                        >
+                          <Save className="h-4 w-4" aria-hidden="true" />
+                        </button>
+                      </form>
                     ) : (
-                      <p className="text-[11px] font-medium text-zinc-400">Valor estándar de receta</p>
+                      <p className="text-2xl font-bold text-zinc-950">
+                        {formatAmount(
+                          detailEvent.kgPerPerson ??
+                            getDefaultKgPerPerson(detailEvent.serviceType),
+                          "kg",
+                        )}
+                      </p>
                     )}
+                  </div>
+                  <div className="mt-auto pt-3">
+                    <p className="text-[11px] font-medium text-zinc-400">
+                      {detailEvent.kgPerPerson != null ? "PERSONALIZADO" : "Valor estándar de receta"}
+                    </p>
                   </div>
                 </div>
               </div>
