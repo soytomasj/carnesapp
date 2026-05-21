@@ -45,6 +45,10 @@ button:not(:disabled):active,
   animation: app-section-enter 280ms ease both;
 }
 
+.section-content {
+  view-transition-name: section-content;
+}
+
 .app-card-enter {
   animation: app-card-enter 260ms ease both;
 }
@@ -433,6 +437,21 @@ select.field-control {
     opacity: 0;
     transform: translateY(-4px) scale(0.98);
   }
+}
+
+@keyframes app-section-exit {
+  to {
+    opacity: 0;
+    transform: translateY(-4px);
+  }
+}
+
+::view-transition-old(section-content) {
+  animation: 180ms ease-out both app-section-exit;
+}
+
+::view-transition-new(section-content) {
+  animation: 240ms ease-in both app-section-enter;
 }
 
 @media (prefers-reduced-motion: reduce) {
