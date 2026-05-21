@@ -248,10 +248,10 @@ export const sideConsumptionRules: ConsumptionRule[] = [
   { productId: "mandioca", amountPerPerson: 0.25 },
   { productId: "sopa", amountPerPerson: 0.12 },
   { productId: "pan", amountPerPerson: 0.08 },
-  { productId: "carbon", amountPerPerson: 0.025 },
 ];
 
 export const unitRatioRules: UnitRatioRule[] = [
   { productId: "piña", peoplePerUnit: 8 },
   { productId: "parrillitas", peoplePerUnit: 10 },
+  { productId: "carbon", peoplePerUnit: 20 },
 ];
