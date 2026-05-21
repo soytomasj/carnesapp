@@ -1,7 +1,7 @@
 @import "tailwindcss";
 
 :root {
-  --background: #f4f5f7;
+  --background: #f5f1ee;
   --foreground: #18181b;
 }
 
@@ -66,8 +66,14 @@ button:not(:disabled):active,
 }
 
 .app-popover {
-  transform-origin: top right;
-  animation: app-popover 160ms ease both;
+  transform-origin: top left;
+  animation: app-popover-in 160ms ease both;
+}
+
+.app-popover-out {
+  transform-origin: top left;
+  pointer-events: none;
+  animation: app-popover-out 160ms ease both;
 }
 
 .app-table-row {
@@ -80,6 +86,53 @@ button:not(:disabled):active,
 .app-table-row:hover {
   transform: translateY(-1px);
 }
+
+/* ─── Custom TimeField ──────────────────────────────────── */
+.time-field {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 1px;
+  height: 2.75rem;
+  width: 100%;
+  border-radius: 12px;
+  border: 1px solid rgb(228 228 231);
+  background: white;
+  transition: border-color 150ms ease, box-shadow 150ms ease;
+}
+.time-field:focus-within {
+  border-color: rgb(82 82 91);
+  box-shadow: 0 0 0 3px rgba(82, 82, 91, 0.08);
+}
+.time-field-part {
+  width: 30px;
+  text-align: center;
+  border: none;
+  outline: none;
+  background: transparent;
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: rgb(24 24 27);
+  padding: 0;
+  caret-color: transparent;
+}
+.time-field-part::placeholder {
+  color: rgb(161 161 170);
+  font-weight: 500;
+}
+.time-field-part:focus {
+  background: rgb(244 244 245);
+  border-radius: 4px;
+}
+.time-field-sep {
+  font-size: 1rem;
+  font-weight: 700;
+  color: rgb(113 113 122);
+  line-height: 1;
+  user-select: none;
+  padding-bottom: 1px;
+}
+/* ────────────────────────────────────────────────────────── */
 
 .field-control {
   height: 2.75rem;
@@ -126,6 +179,147 @@ select.field-control {
   color: rgb(161 161 170);
   font-weight: 500;
 }
+
+/* ─── Animated brand flame (div/border-radius approach) ─── */
+
+/*
+  The flame shape secret: border-radius with 8 values creates a teardrop.
+  Top is rounded (flame tip), bottom is slightly narrower (base).
+  Rotation + scaleX wobble = realistic dancing fire.
+*/
+.bf {
+  position: relative;
+  width: 24px;
+  height: 30px;
+  flex-shrink: 0;
+}
+
+/* Shared layer base */
+.bf-layer {
+  position: absolute;
+  left: 50%;
+  bottom: 0;
+  transform-origin: bottom center;
+  /* teardrop: rounded top tip, flat-ish bottom */
+  border-radius: 50% 50% 30% 30% / 60% 60% 40% 40%;
+}
+
+/* Outer body — wide, dark orange */
+.bf-a {
+  width: 20px;
+  height: 26px;
+  margin-left: -10px;
+  background: radial-gradient(ellipse 60% 70% at 45% 65%, #f07020, #b83010);
+  filter: blur(0.6px);
+  animation: bfA 1.0s ease-in-out infinite alternate;
+}
+
+/* Mid — orange, slightly lifted */
+.bf-b {
+  width: 14px;
+  height: 20px;
+  margin-left: -7px;
+  bottom: 3px;
+  background: radial-gradient(ellipse 60% 70% at 45% 65%, #f5a020, #f07020);
+  filter: blur(0.3px);
+  animation: bfB 0.75s ease-in-out infinite alternate-reverse;
+}
+
+/* Inner — amber/yellow */
+.bf-c {
+  width: 9px;
+  height: 14px;
+  margin-left: -4.5px;
+  bottom: 7px;
+  background: radial-gradient(ellipse 60% 70% at 45% 65%, #ffe060, #f5a828);
+  animation: bfC 0.52s ease-in-out infinite alternate;
+}
+
+/* Core — near-white hot */
+.bf-d {
+  width: 4.5px;
+  height: 8px;
+  margin-left: -2.25px;
+  bottom: 13px;
+  background: radial-gradient(ellipse at center, #fffbe8, #ffe890);
+  border-radius: 50% 50% 40% 40% / 60% 60% 40% 40%;
+  animation: bfD 0.38s ease-in-out infinite alternate-reverse;
+}
+
+/* Base glow disc */
+.bf-glow {
+  position: absolute;
+  bottom: -2px;
+  left: 50%;
+  width: 18px;
+  height: 6px;
+  margin-left: -9px;
+  border-radius: 50%;
+  background: radial-gradient(ellipse at center, rgba(255,100,10,.7), transparent);
+  animation: bfGlow 1.1s ease-in-out infinite;
+}
+
+/* Spark / particle dots */
+.bf-spark {
+  position: absolute;
+  left: 50%;
+  border-radius: 50%;
+  pointer-events: none;
+}
+.bf-s1 { width:3px;   height:3px;   margin-left:-1.5px;  bottom:22px; background:#ffcc44; animation: bfS1 1.9s ease-out infinite 0.0s; }
+.bf-s2 { width:2.5px; height:2.5px; margin-left:-1.25px; bottom:20px; background:#ffd870; animation: bfS2 1.6s ease-out infinite 0.6s; }
+.bf-s3 { width:2px;   height:2px;   margin-left:-1px;    bottom:18px; background:#fff0a0; animation: bfS3 2.1s ease-out infinite 1.1s; }
+.bf-s4 { width:2px;   height:2px;   margin-left:-1px;    bottom:16px; background:#ffaa22; animation: bfS4 1.75s ease-out infinite 0.35s; }
+.bf-s5 { width:1.5px; height:1.5px; margin-left:-.75px;  bottom:24px; background:#ffffff; animation: bfS5 2.2s ease-out infinite 0.85s; }
+
+@keyframes bfA {
+  from { transform: scaleX(1)    rotate(-4deg); }
+  to   { transform: scaleX(0.86) rotate( 5deg); }
+}
+@keyframes bfB {
+  from { transform: scaleX(1)    rotate( 4deg); }
+  to   { transform: scaleX(0.82) rotate(-5deg); }
+}
+@keyframes bfC {
+  from { transform: scaleX(1)    rotate(-7deg) scaleY(1.04); }
+  to   { transform: scaleX(0.78) rotate( 7deg) scaleY(1.10); }
+}
+@keyframes bfD {
+  from { transform: scaleX(1)    scaleY(1)    rotate( 3deg); }
+  to   { transform: scaleX(0.9)  scaleY(0.85) rotate(-3deg); }
+}
+@keyframes bfGlow {
+  0%,100% { transform: scaleX(1);   opacity: .6; }
+  50%      { transform: scaleX(1.2); opacity: 1;  }
+}
+
+@keyframes bfS1 {
+  0%   { transform: translate(0,0)        scale(1);   opacity: 1;   }
+  80%  {                                              opacity: 0;   }
+  100% { transform: translate(-6px,-16px) scale(0.2); opacity: 0;   }
+}
+@keyframes bfS2 {
+  0%   { transform: translate(0,0)       scale(1);   opacity: .9;  }
+  75%  {                                             opacity: 0;   }
+  100% { transform: translate(5px,-18px) scale(0.2); opacity: 0;   }
+}
+@keyframes bfS3 {
+  0%   { transform: translate(0,0)        scale(1);   opacity: 1;   }
+  80%  {                                              opacity: 0;   }
+  100% { transform: translate(-4px,-20px) scale(0.1); opacity: 0;   }
+}
+@keyframes bfS4 {
+  0%   { transform: translate(0,0)       scale(1);   opacity: .85; }
+  70%  {                                             opacity: 0;   }
+  100% { transform: translate(7px,-14px) scale(0.2); opacity: 0;   }
+}
+@keyframes bfS5 {
+  0%   { transform: translate(0,0)        scale(1);   opacity: 1;   }
+  82%  {                                              opacity: 0;   }
+  100% { transform: translate(-2px,-22px) scale(0.1); opacity: 0;   }
+}
+
+/* ────────────────────────────────────────────────────────── */
 
 .brand-fire-shell {
   display: flex;
@@ -217,7 +411,7 @@ select.field-control {
   }
 }
 
-@keyframes app-popover {
+@keyframes app-popover-in {
   from {
     opacity: 0;
     transform: translateY(-4px) scale(0.98);
@@ -226,6 +420,18 @@ select.field-control {
   to {
     opacity: 1;
     transform: translateY(0) scale(1);
+  }
+}
+
+@keyframes app-popover-out {
+  from {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+
+  to {
+    opacity: 0;
+    transform: translateY(-4px) scale(0.98);
   }
 }
 

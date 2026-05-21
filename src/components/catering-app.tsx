@@ -1,7 +1,7 @@
 "use client";
 
 import Image from "next/image";
-import { FormEvent, useEffect, useMemo, useRef, useState } from "react";
+import { Fragment, FormEvent, useEffect, useMemo, useRef, useState } from "react";
 import {
   AlertTriangle,
   CalendarDays,
@@ -10,8 +10,11 @@ import {
   Check,
   ChefHat,
   ClipboardList,
+  ExternalLink,
   Flame,
   Gauge,
+  Link2,
+  MapPin,
   Menu,
   Minus,
   PackageCheck,
@@ -35,6 +38,7 @@ import {
   type EventServiceType,
   type EventStatus,
   type Product,
+  type ProductUnit,
   type ReturnEntry,
   mockProducts,
   recipeConfigs,
@@ -43,18 +47,33 @@ import {
   calculateEventNeeds,
   formatAmount,
   formatEventDate,
+  getDefaultKgPerPerson,
   roundAmount,
   type EventNeed,
 } from "@/lib/catering-calculations";
+import dynamic from "next/dynamic";
+import type { LocationResult } from "./location-picker";
 
-type Section = "dashboard" | "frigorifico" | "insumos" | "eventos";
+const LocationPicker = dynamic(() => import("./location-picker"), { ssr: false });
+
+type Section =
+  | "dashboard"
+  | "frigorifico"
+  | "despensa"
+  | "inventario"
+  | "eventos";
 
 type EventForm = {
   name: string;
   date: string;
+  time: string;
+  location: string;
+  locationLat: number | null;
+  locationLng: number | null;
   manager: string;
   notes: string;
   people: string;
+  kgPerPerson: string;
   status: EventStatus;
   serviceType: EventServiceType;
 };
@@ -92,6 +111,7 @@ type StockFeedback = {
   amount: number;
   productName: string;
   provider?: string;
+  unit: ProductUnit;
 } | null;
 
 type StockReservationEntry = {
@@ -102,6 +122,14 @@ type StockReservationEntry = {
   eventStatus: EventStatus;
   productId: string;
   serviceType: EventServiceType;
+};
+
+type StockProductGroup = {
+  description: string;
+  icon: typeof Gauge;
+  id: string;
+  label: string;
+  productIds: string[];
 };
 
 type EventProductPlanEntry = {
@@ -158,19 +186,8 @@ const stockProviders = [
   "Otro",
 ];
 
-const hiddenProductIds = new Set(["carbon", "mandioca"]);
-const dashboardStockExcludedProductIds = new Set(["carbon"]);
-
-function isVisibleProduct(product: Product): boolean {
-  return !hiddenProductIds.has(product.id);
-}
-
 function isDashboardStockProduct(product: Product): boolean {
-  return (
-    product.category !== "Fuego" &&
-    !dashboardStockExcludedProductIds.has(product.id) &&
-    isVisibleProduct(product)
-  );
+  return product.category === "Carnes" || product.category === "Embutidos";
 }
 
 const sections: Array<{
@@ -180,7 +197,103 @@ const sections: Array<{
 }> = [
   { id: "dashboard", label: "Dashboard", icon: Gauge },
   { id: "frigorifico", label: "Frigorífico", icon: Refrigerator },
+  { id: "despensa", label: "Despensa", icon: Utensils },
+  { id: "inventario", label: "Inventario", icon: ClipboardList },
   { id: "eventos", label: "Eventos", icon: CalendarDays },
+];
+
+const pantryProductGroups: StockProductGroup[] = [
+  {
+    description: "Comida, guarniciones y extras servidos en mesa.",
+    icon: Utensils,
+    id: "alimentos",
+    label: "Alimentos y acompañamientos",
+    productIds: [
+      "pan-de-ajo",
+      "mandioca",
+      "sopa",
+      "mbeju",
+      "piña",
+      "leche-condensada",
+      "canela",
+    ],
+  },
+  {
+    description: "Preparación previa, salado y fuego.",
+    icon: Flame,
+    id: "preparacion",
+    label: "Preparación y fuego",
+    productIds: ["sal", "carbon"],
+  },
+];
+
+const inventarioProductGroups: StockProductGroup[] = [
+  {
+    description: "Parrillas, fogoneros y estructuras de asado.",
+    icon: Flame,
+    id: "parrillas",
+    label: "Parrillas y fogones",
+    productIds: [
+      "parrillitas", "parrilla-giragrill", "parrilla-convencional",
+      "fogonero", "asador-en-cruz", "espadines",
+    ],
+  },
+  {
+    description: "Herramientas para el manejo del asado y la parrilla.",
+    icon: Utensils,
+    id: "herramientas",
+    label: "Herramientas de asado",
+    productIds: [
+      "palitas", "atizadores", "pinzas",
+      "cuchillo-espeto", "tenedor-espeto",
+      "tenedor-largo", "cuchillo-largo", "cuchillo-de-mesa",
+      "cucharas", "cucharas-anchas", "tablas-de-picar",
+    ],
+  },
+  {
+    description: "Bandejas, pailas y contenedores.",
+    icon: PackageCheck,
+    id: "utensilios",
+    label: "Utensilios y recipientes",
+    productIds: [
+      "bandejas-metalicas", "bandeja-espeto",
+      "pailas", "caja-negra",
+    ],
+  },
+  {
+    description: "Mesas, toldos y mobiliario del servicio.",
+    icon: ClipboardList,
+    id: "mobiliario",
+    label: "Mobiliario",
+    productIds: ["mesas", "toldo"],
+  },
+  {
+    description: "Tendido eléctrico, iluminación y adaptadores.",
+    icon: PackagePlus,
+    id: "electricidad",
+    label: "Electricidad",
+    productIds: ["alargue", "triple", "focos", "portafoco"],
+  },
+  {
+    description: "Delantales, trapos y elementos de limpieza.",
+    icon: ChefHat,
+    id: "indumentaria",
+    label: "Indumentaria y limpieza",
+    productIds: ["delantales", "trapos", "bachas"],
+  },
+  {
+    description: "Elementos que se consumen durante el servicio.",
+    icon: ShoppingCart,
+    id: "servicio",
+    label: "Servicio y descartables",
+    productIds: [
+      "escarbadientes-cortos",
+      "escarbadientes-largos",
+      "servilletas",
+      "stickers",
+      "bandeja-isopor",
+    ],
+  },
 ];
 
 const eventStatusCopy: Record<EventStatus, string> = {
@@ -237,6 +350,7 @@ function isEventStatus(value: unknown): value is EventStatus {
   return (
     value === "pendiente" ||
     value === "confirmado" ||
+    value === "preparado" ||
     value === "finalizado"
   );
 }
@@ -288,10 +402,17 @@ function normalizeEvents(value: unknown): CateringEvent[] | null {
       manager: typeof item.manager === "string" ? item.manager : "",
       name: item.name as string,
       date: normalizeEventDateInput(item.date as string) ?? (item.date as string),
+      ...(typeof item.time === "string" && item.time ? { time: item.time } : {}),
+      ...(typeof item.location === "string" && item.location ? { location: item.location } : {}),
+      ...(typeof item.locationLat === "number" && isFinite(item.locationLat) ? { locationLat: item.locationLat } : {}),
+      ...(typeof item.locationLng === "number" && isFinite(item.locationLng) ? { locationLng: item.locationLng } : {}),
       notes: typeof item.notes === "string" ? item.notes : "",
       people: Math.max(1, Math.round(Number(item.people))),
       status: item.status as EventStatus,
       serviceType: item.serviceType as EventServiceType,
+      ...(typeof item.kgPerPerson === "number" && item.kgPerPerson > 0
+        ? { kgPerPerson: item.kgPerPerson }
+        : {}),
     }))
     .sort((first, second) => first.date.localeCompare(second.date));
 }
@@ -461,9 +582,14 @@ export default function CateringApp() {
   const [eventForm, setEventForm] = useState<EventForm>({
     name: "",
     date: "14/06/2026",
+    time: "",
+    location: "",
+    locationLat: null,
+    locationLng: null,
     manager: "",
     notes: "",
     people: "60",
+    kgPerPerson: "",
     status: "pendiente",
     serviceType: "picada",
   });
@@ -745,17 +871,21 @@ export default function CateringApp() {
       dataResetVersion: LOCAL_STORAGE_RESET_VERSION,
       eventProductPlanLog,
       events,
-      products,
+      products: products.map((p) => ({ id: p.id, currentStock: p.currentStock })),
       returnLog,
       selectedEventId,
       stockDepartureEventIds,
       stockMovements,
     };
 
-    window.localStorage.setItem(
-      LOCAL_STORAGE_KEY,
-      JSON.stringify(stateToPersist),
-    );
+    try {
+      window.localStorage.setItem(
+        LOCAL_STORAGE_KEY,
+        JSON.stringify(stateToPersist),
+      );
+    } catch {
+      setSyncStatus("error");
+    }
 
     const syncTimeoutId = window.setTimeout(async () => {
       try {
@@ -824,11 +954,6 @@ export default function CateringApp() {
     stockDepartureEventIds,
   ]);
 
-  useEffect(() => {
-    if (activeSection === "insumos") {
-      setActiveSection("dashboard");
-    }
-  }, [activeSection]);
 
   useEffect(() => {
     function handleKeyDown(event: KeyboardEvent) {
@@ -868,14 +993,14 @@ export default function CateringApp() {
       nextEvent
         ? getEventOperationalNeeds(
             nextEvent,
-            products.filter(isVisibleProduct),
+            products,
             eventProductPlanLog[nextEvent.id],
           )
         : [],
     [eventProductPlanLog, nextEvent, products],
   );
   const nextPreparationTotal = nextNeeds.reduce(
-    (total, need) => total + need.missing,
+    (total, need) => need.product.unit === "kg" ? total + need.missing : total,
     0,
   );
   const stockTotal = products.reduce(
@@ -886,15 +1011,19 @@ export default function CateringApp() {
     0,
   );
   const visibleProducts = useMemo(
-    () => products.filter(isVisibleProduct),
+    () => products,
     [products],
   );
   const fridgeProducts = useMemo(
-    () => visibleProducts.filter((product) => product.category !== "Fuego"),
+    () => visibleProducts.filter((p) => p.category === "Carnes" || p.category === "Embutidos"),
     [visibleProducts],
   );
-  const supplyProducts = useMemo(
-    () => visibleProducts.filter((product) => product.category === "Fuego"),
+  const despensaProducts = useMemo(
+    () => visibleProducts.filter((p) => p.category === "Despensa"),
+    [visibleProducts],
+  );
+  const inventoryProducts = useMemo(
+    () => visibleProducts.filter((p) => p.category === "Inventario"),
     [visibleProducts],
   );
   const selectedProduct = products.find(
@@ -935,6 +1064,7 @@ export default function CateringApp() {
       amount: stockToAdd,
       productName: selectedProduct?.name ?? "Producto",
       provider: stockForm.provider,
+      unit: selectedProduct?.unit ?? "kg",
     });
     setStockForm((current) => ({ ...current, value: "" }));
   }
@@ -998,12 +1128,17 @@ export default function CateringApp() {
     }
 
     const movementLabel = movement.type === "entrada" ? "entrada" : "salida";
+    const product = products.find((item) => item.id === movement.productId);
+    const movementUnit = product?.unit ?? "kg";
     const stockEffect =
       movement.type === "entrada"
         ? "Se descontará del stock actual."
         : "Se devolverá al stock actual.";
     const confirmed = window.confirm(
-      `¿Eliminar esta ${movementLabel} de ${formatAmount(movement.amount, "kg")}? ${stockEffect}`,
+      `¿Eliminar esta ${movementLabel} de ${formatAmount(
+        movement.amount,
+        movementUnit,
+      )}? ${stockEffect}`,
     );
 
     if (!confirmed) {
@@ -1040,13 +1175,11 @@ export default function CateringApp() {
     const needsByProduct = new Map(
       getEventOperationalNeeds(
         event,
-        products.filter(isVisibleProduct),
+        products,
         eventProductPlanLog[event.id],
       ).map((need) => [need.product.id, need.total]),
     );
-    const departures = products
-      .filter(isVisibleProduct)
-      .map((product) => {
+    const departures = products.map((product) => {
         const neededStock = needsByProduct.get(product.id) ?? 0;
         const deductedStock = roundAmount(
           Math.min(product.currentStock, neededStock),
@@ -1117,6 +1250,9 @@ export default function CateringApp() {
     event.preventDefault();
     const people = Number(eventForm.people);
     const normalizedDate = normalizeEventDateInput(eventForm.date);
+    const normalizedTime = normalizeEventTimeInput(eventForm.time);
+    const kgPerPerson = parseAmountInput(eventForm.kgPerPerson);
+    const defaultKgPerPerson = getDefaultKgPerPerson(eventForm.serviceType);
 
     if (!eventForm.name.trim() || !normalizedDate || people < 1) {
       return;
@@ -1127,10 +1263,17 @@ export default function CateringApp() {
       manager: formatPersonName(eventForm.manager),
       name: eventForm.name.trim(),
       date: normalizedDate,
+      ...(normalizedTime ? { time: normalizedTime } : {}),
+      ...(eventForm.location.trim() ? { location: eventForm.location.trim() } : {}),
+      ...(eventForm.locationLat !== null ? { locationLat: eventForm.locationLat } : {}),
+      ...(eventForm.locationLng !== null ? { locationLng: eventForm.locationLng } : {}),
       notes: eventForm.notes.trim(),
       people: Math.round(people),
       status: eventForm.status,
       serviceType: eventForm.serviceType,
+      ...(kgPerPerson > 0 && kgPerPerson !== defaultKgPerPerson
+        ? { kgPerPerson }
+        : {}),
     };
 
     setEvents((currentEvents) =>
@@ -1147,9 +1290,14 @@ export default function CateringApp() {
     setEventForm({
       name: "",
       date: formatDateForForm(normalizedDate),
+      time: "",
+      location: "",
+      locationLat: null,
+      locationLng: null,
       manager: "",
       notes: "",
       people: "60",
+      kgPerPerson: "",
       status: "pendiente",
       serviceType: eventForm.serviceType,
     });
@@ -1176,6 +1324,9 @@ export default function CateringApp() {
   function updateEvent(eventId: string, form: EventForm) {
     const people = Number(form.people);
     const normalizedDate = normalizeEventDateInput(form.date);
+    const normalizedTime = normalizeEventTimeInput(form.time);
+    const kgPerPerson = parseAmountInput(form.kgPerPerson);
+    const defaultKgPerPerson = getDefaultKgPerPerson(form.serviceType);
 
     if (!form.name.trim() || !normalizedDate || people < 1) {
       return;
@@ -1188,10 +1339,23 @@ export default function CateringApp() {
           manager: formatPersonName(form.manager),
           name: form.name.trim(),
           date: normalizedDate,
+          ...(normalizedTime ? { time: normalizedTime } : { time: undefined }),
+          ...(form.location.trim()
+            ? { location: form.location.trim() }
+            : { location: undefined }),
+          ...(form.locationLat !== null && form.location.trim()
+            ? { locationLat: form.locationLat }
+            : { locationLat: undefined }),
+          ...(form.locationLng !== null && form.location.trim()
+            ? { locationLng: form.locationLng }
+            : { locationLng: undefined }),
           notes: form.notes.trim(),
           people: Math.round(people),
           status: form.status,
           serviceType: form.serviceType,
+          ...(kgPerPerson > 0 && kgPerPerson !== defaultKgPerPerson
+            ? { kgPerPerson }
+            : { kgPerPerson: undefined }),
         }
       : null;
 
@@ -1213,14 +1377,39 @@ export default function CateringApp() {
                 manager: formatPersonName(form.manager),
                 name: form.name.trim(),
                 date: normalizedDate,
+                ...(normalizedTime
+                  ? { time: normalizedTime }
+                  : { time: undefined }),
+                ...(form.location.trim()
+                  ? { location: form.location.trim() }
+                  : { location: undefined }),
+                ...(form.locationLat !== null && form.location.trim()
+                  ? { locationLat: form.locationLat }
+                  : { locationLat: undefined }),
+                ...(form.locationLng !== null && form.location.trim()
+                  ? { locationLng: form.locationLng }
+                  : { locationLng: undefined }),
                 notes: form.notes.trim(),
                 people: Math.round(people),
                 status: form.status,
                 serviceType: form.serviceType,
+                ...(kgPerPerson > 0 && kgPerPerson !== defaultKgPerPerson
+                  ? { kgPerPerson }
+                  : { kgPerPerson: undefined }),
               }
             : event,
         )
         .sort((first, second) => first.date.localeCompare(second.date)),
+    );
+  }
+
+  function updateEventKgPerPerson(eventId: string, value: number | undefined) {
+    setEvents((currentEvents) =>
+      currentEvents.map((event) =>
+        event.id === eventId
+          ? { ...event, kgPerPerson: value }
+          : event,
+      ),
     );
   }
 
@@ -1594,38 +1783,66 @@ export default function CateringApp() {
               selectedProduct={fridgeProducts.find(
                 (product) => product.id === selectedProduct?.id,
               )}
+              showProvider
               stockFeedback={stockFeedback}
               stockMovements={stockMovements}
               stockForm={stockForm}
               stockIcon={Refrigerator}
               stockTitle="Stock del frigorífico"
-              subtitle="Lectura rápida de carnes, guarniciones y panificados, todo cargado en kg."
+              subtitle="Carnes y embutidos, todo en kg."
               title="Stock actual del frigorífico"
             />
           )}
 
-          {activeSection === "insumos" && (
+          {activeSection === "despensa" && (
             <FridgeSection
               eventProductPlanLog={eventProductPlanLog}
               events={events}
-              eyebrow="Insumos"
+              eyebrow="Despensa"
               onDeleteStockMovement={deleteStockMovement}
               onSetManualProductStock={setManualProductStock}
               onStockFeedbackDone={() => setStockFeedback(null)}
               onStockFormChange={setStockForm}
               onStockSubmit={handleStockSubmit}
-              products={supplyProducts}
+              productGroups={pantryProductGroups}
+              products={despensaProducts}
               returnLog={returnLog}
-              selectedProduct={supplyProducts.find(
+              selectedProduct={despensaProducts.find(
                 (product) => product.id === selectedProduct?.id,
               )}
               stockFeedback={stockFeedback}
               stockMovements={stockMovements}
               stockForm={stockForm}
-              stockIcon={PackageCheck}
-              stockTitle="Stock de insumos"
-              subtitle="Control separado de carbón y otros insumos operativos."
-              title="Insumos disponibles"
+              stockIcon={Utensils}
+              stockTitle="Stock de despensa"
+              subtitle="Alimentos, descartables y preparación del servicio en un solo control."
+              title="Despensa"
+            />
+          )}
+
+          {activeSection === "inventario" && (
+            <FridgeSection
+              eventProductPlanLog={eventProductPlanLog}
+              events={events}
+              eyebrow="Inventario"
+              onDeleteStockMovement={deleteStockMovement}
+              onSetManualProductStock={setManualProductStock}
+              onStockFeedbackDone={() => setStockFeedback(null)}
+              onStockFormChange={setStockForm}
+              onStockSubmit={handleStockSubmit}
+              productGroups={inventarioProductGroups}
+              products={inventoryProducts}
+              returnLog={returnLog}
+              selectedProduct={inventoryProducts.find(
+                (product) => product.id === selectedProduct?.id,
+              )}
+              stockFeedback={stockFeedback}
+              stockMovements={stockMovements}
+              stockForm={stockForm}
+              stockIcon={ClipboardList}
+              stockTitle="Inventario operativo"
+              subtitle="Parrillas, utensilios, herramientas y equipos: qué hay, qué está reservado y qué falta."
+              title="Inventario de equipos"
             />
           )}
 
@@ -1644,6 +1861,7 @@ export default function CateringApp() {
               onUpdateReturnEntry={updateReturnEntry}
               onStatusChange={updateEventStatus}
               onUpdateEvent={updateEvent}
+              onUpdateEventKgPerPerson={updateEventKgPerPerson}
               products={visibleProducts}
               returnLog={returnLog}
               selectedEvent={selectedEvent}
@@ -1681,7 +1899,7 @@ function Sidebar({
               onClick={() => onChange(section.id)}
               className={`flex w-full items-center gap-3 rounded-[8px] px-3 py-3 text-left text-sm font-semibold transition ${
                 isActive
-                  ? "bg-zinc-950 text-white shadow-[0_16px_34px_rgba(39,39,42,0.18)]"
+                  ? "bg-[#8f2f2b] text-white shadow-[0_12px_24px_rgba(143,47,43,0.22)]"
                   : "text-zinc-600 hover:bg-zinc-100 hover:text-zinc-950"
               }`}
             >
@@ -1692,16 +1910,14 @@ function Sidebar({
         })}
       </nav>
 
-      <div className="mt-auto rounded-[8px] border border-zinc-200 bg-zinc-50 p-4">
-        <div className="flex items-center gap-3">
-          <div className="flex h-9 w-9 items-center justify-center rounded-[8px] bg-[#2f3b2f] text-white">
-            <Truck className="h-4 w-4" aria-hidden="true" />
+      <div className="mt-auto border-t border-zinc-200/80 pt-4">
+        <div className="flex items-center gap-2.5">
+          <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-[8px] bg-zinc-100 text-zinc-500">
+            <Truck className="h-3.5 w-3.5" aria-hidden="true" />
           </div>
           <div>
-            <p className="text-sm font-semibold text-zinc-950">
-              Operación activa
-            </p>
-            <p className="mt-1 text-xs text-zinc-500">Asados y catering</p>
+            <p className="text-xs font-semibold text-zinc-700">Operación activa</p>
+            <p className="text-[11px] text-zinc-400">Asados y catering</p>
           </div>
         </div>
       </div>
@@ -1733,7 +1949,7 @@ function MobileNav({
               onClick={() => onChange(section.id)}
               className={`flex items-center justify-center gap-2 rounded-[8px] px-2 py-2 text-xs font-semibold ${
                 isActive
-                  ? "bg-zinc-950 text-white"
+                  ? "bg-[#8f2f2b] text-white"
                   : "bg-zinc-100 text-zinc-600"
               }`}
             >
@@ -1743,6 +1959,23 @@ function MobileNav({
           );
         })}
       </div>
+    </div>
+  );
+}
+
+function AnimatedFlame() {
+  return (
+    <div className="bf" aria-hidden="true">
+      <div className="bf-glow" />
+      <div className="bf-layer bf-a" />
+      <div className="bf-layer bf-b" />
+      <div className="bf-layer bf-c" />
+      <div className="bf-layer bf-d" />
+      <div className="bf-spark bf-s1" />
+      <div className="bf-spark bf-s2" />
+      <div className="bf-spark bf-s3" />
+      <div className="bf-spark bf-s4" />
+      <div className="bf-spark bf-s5" />
     </div>
   );
 }
@@ -1771,11 +2004,8 @@ function Brand({
 
   return (
     <div className="flex items-center gap-3">
-      <div className="brand-fire-shell" aria-hidden="true">
-        <Flame
-          className="h-6 w-6 fill-[#ff9f1c] text-[#ffcf5a]"
-          strokeWidth={2.6}
-        />
+      <div className="brand-fire-shell">
+        <AnimatedFlame />
       </div>
       <div className="flex min-w-0 flex-col justify-center gap-1">
         <p className="truncate text-sm font-bold leading-4 text-zinc-950">
@@ -1856,6 +2086,7 @@ function DashboardSection({
         <StatCard
           icon={Truck}
           label="Próximo evento"
+          smallValue
           value={nextEvent ? formatEventNameDisplay(nextEvent.name) : "Agenda libre"}
           detail={
             nextEvent
@@ -1866,18 +2097,6 @@ function DashboardSection({
         />
       </section>
 
-      {nextEvent && (
-        <Panel>
-          <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-            <SectionTitle
-              icon={ClipboardList}
-              title="Próximo evento"
-              subtitle={`${formatEventNameDisplay(nextEvent.name)} · ${nextEvent.people} personas · ${serviceTypeCopy[nextEvent.serviceType]}`}
-            />
-            <EventStatusBadge status={nextEvent.status} />
-          </div>
-        </Panel>
-      )}
     </div>
   );
 }
@@ -1891,12 +2110,14 @@ function FridgeSection({
   onStockFeedbackDone,
   onStockFormChange,
   onStockSubmit,
+  productGroups,
   products,
   returnLog,
   selectedProduct,
   stockFeedback,
   stockMovements,
   stockForm,
+  showProvider = false,
   stockIcon,
   stockTitle,
   subtitle,
@@ -1910,12 +2131,14 @@ function FridgeSection({
   onStockFeedbackDone: () => void;
   onStockFormChange: (form: StockForm) => void;
   onStockSubmit: (event: FormEvent<HTMLFormElement>) => void;
+  productGroups?: StockProductGroup[];
   products: Product[];
   returnLog: EventReturnLog;
   selectedProduct?: Product;
   stockFeedback: StockFeedback;
   stockMovements: StockMovement[];
   stockForm: StockForm;
+  showProvider?: boolean;
   stockIcon: typeof Gauge;
   stockTitle: string;
   subtitle: string;
@@ -1930,6 +2153,11 @@ function FridgeSection({
   const selectedProductVisual = selectedProduct
     ? getProductVisual(selectedProduct)
     : null;
+  const stockFormStep = selectedProduct?.unit === "un" ? 1 : 0.5;
+  const groupedProducts = useMemo(
+    () => groupStockProducts(products, productGroups),
+    [productGroups, products],
+  );
 
   useBodyScrollLock(Boolean(detailProduct));
 
@@ -2236,9 +2464,9 @@ function FridgeSection({
 
           <button
             type="button"
-            onClick={() => updateStockFormQuantity(0.5)}
+            onClick={() => updateStockFormQuantity(stockFormStep)}
             className="mb-1.5 flex h-11 items-center justify-center rounded-[8px] border border-zinc-200 bg-white px-3 text-zinc-700 transition hover:border-zinc-400"
-            aria-label="Sumar 0,5 kg a la cantidad"
+            aria-label={`Sumar ${formatAmount(stockFormStep, selectedProduct?.unit ?? "kg")} a la cantidad`}
             title="Sumar"
           >
             <Plus className="h-4 w-4" aria-hidden="true" />
@@ -2246,14 +2474,15 @@ function FridgeSection({
 
           <button
             type="button"
-            onClick={() => updateStockFormQuantity(-0.5)}
+            onClick={() => updateStockFormQuantity(-stockFormStep)}
             className="mb-1.5 flex h-11 items-center justify-center rounded-[8px] border border-zinc-200 bg-white px-3 text-zinc-700 transition hover:border-zinc-400"
-            aria-label="Restar 0,5 kg a la cantidad"
+            aria-label={`Restar ${formatAmount(stockFormStep, selectedProduct?.unit ?? "kg")} a la cantidad`}
             title="Restar"
           >
             <Minus className="h-4 w-4" aria-hidden="true" />
           </button>
 
+          {showProvider && (
           <div ref={providerPickerRef} className="relative h-[72px] space-y-2">
             <span className="text-xs font-semibold uppercase text-zinc-500">
               Proveedor
@@ -2310,6 +2539,7 @@ function FridgeSection({
               </div>
             )}
           </div>
+          )}
 
           <button
             type="submit"
@@ -2329,7 +2559,7 @@ function FridgeSection({
         </form>
         {stockFeedback && (
           <div className="app-feedback-toast absolute right-6 top-6 z-30 rounded-[8px] border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm font-semibold text-emerald-900 shadow-[0_14px_34px_rgba(16,185,129,0.18)]">
-            {formatAmount(stockFeedback.amount, "kg")} de{" "}
+            {formatAmount(stockFeedback.amount, stockFeedback.unit)} de{" "}
             {stockFeedback.productName} agregado
             {stockFeedback.provider ? ` · Proveedor: ${stockFeedback.provider}` : ""}
           </div>
@@ -2343,11 +2573,11 @@ function FridgeSection({
           subtitle={`${products.length} productos activos`}
         />
         <div className="mt-5 overflow-x-auto">
-          <table className="w-full min-w-[680px] border-separate border-spacing-0 text-left text-sm">
+          <table className="w-full min-w-[780px] border-separate border-spacing-0 text-left text-sm">
             <thead>
               <tr className="text-xs font-semibold uppercase text-zinc-500">
                 <th className="border-b border-zinc-200 pb-3">Producto</th>
-                <th className="w-28 border-b border-zinc-200 pb-3 text-center">
+                <th className="w-28 border-b border-zinc-200 pb-3 pr-6 text-center">
                   Categoría
                 </th>
                 <th className="w-24 border-b border-zinc-200 pb-3 text-center">
@@ -2359,17 +2589,54 @@ function FridgeSection({
                 <th className="w-24 border-b border-zinc-200 pb-3 text-center">
                   Disponible
                 </th>
+                <th className="w-24 border-b border-zinc-200 pb-3 text-center">
+                  Falta
+                </th>
               </tr>
             </thead>
             <tbody>
-              {products.map((product) => (
-                <StockTableRow
-                  key={product.id}
-                  onOpen={() => setDetailProductId(product.id)}
-                  product={product}
-                  reservedStock={reservedStockByProduct[product.id] ?? 0}
-                />
-              ))}
+              {(() => {
+                const hasMultipleGroups = groupedProducts.length > 1;
+                return groupedProducts.map((group) => {
+                const GroupIcon = group.icon;
+
+                return (
+                  <Fragment key={group.id}>
+                    {hasMultipleGroups && (
+                      <tr>
+                        <td colSpan={6} className="bg-zinc-50 px-3 py-3">
+                          <div className="flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between">
+                            <div className="flex items-center gap-2">
+                              <GroupIcon
+                                className="h-4 w-4 text-zinc-500"
+                                aria-hidden="true"
+                              />
+                              <p className="text-xs font-bold uppercase text-zinc-700">
+                                {group.label}
+                              </p>
+                            </div>
+                            <p className="text-xs font-medium text-zinc-500">
+                              {group.description}
+                            </p>
+                          </div>
+                        </td>
+                      </tr>
+                    )}
+                    {group.products.map((product) => (
+                      <StockTableRow
+                        key={product.id}
+                        categoryLabel={
+                          hasMultipleGroups ? group.label : product.category
+                        }
+                        onOpen={() => setDetailProductId(product.id)}
+                        product={product}
+                        reservedStock={reservedStockByProduct[product.id] ?? 0}
+                      />
+                    ))}
+                  </Fragment>
+                );
+              });
+              })()}
             </tbody>
           </table>
         </div>
@@ -2407,6 +2674,7 @@ function EventsSection({
   onUpdateEventProductPlan,
   onUpdateReturnEntry,
   onUpdateEvent,
+  onUpdateEventKgPerPerson,
   products,
   returnLog,
   selectedEvent,
@@ -2439,6 +2707,7 @@ function EventsSection({
     value: string,
   ) => void;
   onUpdateEvent: (eventId: string, form: EventForm) => void;
+  onUpdateEventKgPerPerson: (eventId: string, value: number | undefined) => void;
   products: Product[];
   returnLog: EventReturnLog;
   selectedEvent?: CateringEvent;
@@ -2447,6 +2716,8 @@ function EventsSection({
   const [detailEventId, setDetailEventId] = useState<string | null>(null);
   const [editingEventId, setEditingEventId] = useState<string | null>(null);
   const [isCreatingEvent, setIsCreatingEvent] = useState(false);
+  const [showLocationPicker, setShowLocationPicker] = useState(false);
+  const [showLinkInput, setShowLinkInput] = useState(false);
   const [isAddingProduct, setIsAddingProduct] = useState(false);
   const [agendaFilter, setAgendaFilter] =
     useState<EventAgendaFilter>("todos");
@@ -2454,12 +2725,22 @@ function EventsSection({
   const [draftProductPlan, setDraftProductPlan] = useState<EventProductPlanLog[string]>({});
   const [draftReturnLog, setDraftReturnLog] = useState<EventReturnLog[string]>({});
   const [hasSavedDraft, setHasSavedDraft] = useState(false);
+  const [isEditingKgPerPerson, setIsEditingKgPerPerson] = useState(false);
+  const [kgPerPersonDraft, setKgPerPersonDraft] = useState("");
   const [editEventForm, setEditEventForm] = useState<EventForm>({
     name: selectedEvent?.name ?? "",
     date: selectedEvent?.date ?? "",
+    time: selectedEvent?.time ?? "",
+    location: selectedEvent?.location ?? "",
+    locationLat: selectedEvent?.locationLat ?? null,
+    locationLng: selectedEvent?.locationLng ?? null,
     manager: selectedEvent?.manager ?? "",
     notes: selectedEvent?.notes ?? "",
     people: selectedEvent?.people.toString() ?? "1",
+    kgPerPerson:
+      selectedEvent?.kgPerPerson != null
+        ? formatAmountInputValue(selectedEvent.kgPerPerson)
+        : "",
     status: selectedEvent?.status ?? "pendiente",
     serviceType: selectedEvent?.serviceType ?? "picada",
   });
@@ -2537,22 +2818,28 @@ function EventsSection({
   );
   const detailEstimatedConsumptionTotal = detailEvent
     ? clampAmount(
-        calculateEventNeeds(detailEvent, products).reduce(
-          (total, need) => total + need.base,
+        detailNeeds.reduce(
+          (total, need) =>
+            need.product.unit === "kg" ? total + need.base : total,
           0,
         ),
       )
     : 0;
   const detailSentTotal = clampAmount(
-    detailNeeds.reduce((total, need) => total + need.total, 0),
+    detailNeeds.reduce(
+      (total, need) =>
+        need.product.unit === "kg" ? total + need.total : total,
+      0,
+    ),
   );
   const detailReturnedTotal = detailEvent
     ? clampAmount(
         detailNeeds.reduce(
           (total, need) =>
-            total +
-            getDraftReturnEntry(need.product.id, draftReturnLog)
-              .returned,
+            need.product.unit === "kg"
+              ? total +
+                getDraftReturnEntry(need.product.id, draftReturnLog).returned
+              : total,
           0,
         ),
       )
@@ -2612,6 +2899,23 @@ function EventsSection({
       document.removeEventListener("keydown", handleKeyDown);
     };
   }, [isAgendaFilterOpen]);
+
+  useEffect(() => {
+    if (!isCreatingEvent) {
+      return;
+    }
+
+    function handleKeyDown(event: KeyboardEvent) {
+      if (event.key === "Escape") {
+        event.stopPropagation();
+        setIsCreatingEvent(false);
+      }
+    }
+
+    document.addEventListener("keydown", handleKeyDown, true);
+
+    return () => document.removeEventListener("keydown", handleKeyDown, true);
+  }, [isCreatingEvent]);
 
   useEffect(() => {
     if (!editingEventId) {
@@ -2681,9 +2985,17 @@ function EventsSection({
     setEditEventForm({
       name: event.name,
       date: formatDateForForm(event.date),
+      time: event.time ?? "",
+      location: event.location ?? "",
+      locationLat: event.locationLat ?? null,
+      locationLng: event.locationLng ?? null,
       manager: event.manager ?? "",
       notes: event.notes ?? "",
       people: event.people.toString(),
+      kgPerPerson:
+        event.kgPerPerson != null
+          ? formatAmountInputValue(event.kgPerPerson)
+          : "",
       status: event.status,
       serviceType: event.serviceType,
     });
@@ -2885,18 +3197,27 @@ function EventsSection({
         subtitle="Vista rápida de eventos próximos, preparados y finalizados. Abrí cada evento para operar cantidades y retornos."
       />
 
-      <section className="grid gap-3 sm:grid-cols-3">
-        <EventMetricCard
+      <section className="grid gap-4 sm:grid-cols-3">
+        <StatCard
+          icon={CalendarDays}
           label="Eventos cargados"
           value={orderedEvents.length.toString()}
+          detail="Total en agenda"
+          tone="bg-zinc-100 text-zinc-700"
         />
-        <EventMetricCard
+        <StatCard
+          icon={ClipboardList}
           label="Activos"
           value={pendingEventsCount.toString()}
+          detail="Pendientes y preparados"
+          tone="bg-[#edf7f1] text-[#2f6b4f]"
         />
-        <EventMetricCard
+        <StatCard
+          icon={PackageCheck}
           label="Finalizados"
           value={finishedEventsCount.toString()}
+          detail="Servicios completados"
+          tone="bg-zinc-100 text-zinc-500"
         />
       </section>
 
@@ -2981,8 +3302,8 @@ function EventsSection({
                   key={event.id}
                   className={`app-card-enter flex min-h-[168px] flex-col rounded-[8px] border p-4 text-left transition ${
                     isActive
-                      ? "border-[#8f2f2b]/45 bg-white text-zinc-950 shadow-[0_16px_34px_rgba(143,47,43,0.12)]"
-                      : "border-zinc-200 bg-white text-zinc-950 hover:border-zinc-400"
+                      ? "border-zinc-800 bg-white text-zinc-950 shadow-[0_8px_24px_rgba(39,39,42,0.13)]"
+                      : "border-zinc-200 bg-white text-zinc-950 hover:border-zinc-400 hover:shadow-[0_4px_12px_rgba(39,39,42,0.06)]"
                   }`}
                 >
                   <button
@@ -2992,6 +3313,7 @@ function EventsSection({
                         onSelectEvent(event.id);
                       }
                       setDetailEventId(event.id);
+                      setIsEditingKgPerPerson(false);
                     }}
                     className="block w-full text-left"
                   >
@@ -3091,7 +3413,7 @@ function EventsSection({
                 <EmptyState
                   text={
                     orderedEvents.length === 0
-                      ? "No hay eventos cargados. Creá uno para calcular insumos."
+                      ? "No hay eventos cargados. Creá uno para calcular stock."
                       : "No hay eventos para este filtro."
                   }
                 />
@@ -3169,23 +3491,125 @@ function EventsSection({
             </div>
 
             <div className="min-h-0 flex-1 overflow-y-auto px-5 py-5 sm:px-6">
-              <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+              <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-5">
                 <EventMetricCard
                   label="Consumo estimado"
                   value={formatAmount(detailEstimatedConsumptionTotal, "kg")}
+                  icon={Scale}
+                  tone="bg-[#edf7f1] text-[#2f6b4f]"
+                  detail="Base sin preventivo"
                 />
                 <EventMetricCard
                   label="Total enviado"
                   value={formatAmount(detailSentTotal, "kg")}
+                  icon={Truck}
+                  tone="bg-[#eef3fb] text-[#2c4e8a]"
+                  detail="Incluye buffer preventivo"
                 />
                 <EventMetricCard
                   label="Total consumido"
                   value={formatAmount(detailConsumedTotal, "kg")}
+                  icon={Flame}
+                  tone="bg-[#fef3ee] text-[#a35612]"
+                  detail="Enviado menos retornado"
                 />
                 <EventMetricCard
                   label="Total retornado"
                   value={formatAmount(detailReturnedTotal, "kg")}
+                  icon={PackageCheck}
+                  tone="bg-zinc-100 text-zinc-600"
+                  detail="Stock recuperado"
                 />
+                <div className="relative flex flex-col rounded-[8px] border border-zinc-200 bg-white p-4 shadow-[0_8px_24px_rgba(39,39,42,0.04)]">
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="flex flex-col gap-1">
+                      <p className="text-[11px] font-bold uppercase tracking-[0.02em] text-zinc-500">
+                        Kg / persona
+                      </p>
+                    </div>
+                    <div className="flex shrink-0 items-center gap-1">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          if (!isEditingKgPerPerson) {
+                            setKgPerPersonDraft(
+                              formatAmountInputValue(
+                                detailEvent.kgPerPerson ??
+                                  getDefaultKgPerPerson(detailEvent.serviceType),
+                              ),
+                            );
+                          }
+                          setIsEditingKgPerPerson((v) => !v);
+                        }}
+                        className="inline-flex h-8 w-8 items-center justify-center rounded-[8px] border border-transparent text-zinc-400 transition hover:border-zinc-200 hover:bg-zinc-50 hover:text-zinc-700"
+                        aria-label="Editar kg por persona"
+                        title="Editar kg/persona"
+                      >
+                        <Pencil className="h-3.5 w-3.5" aria-hidden="true" />
+                      </button>
+                    </div>
+                  </div>
+                  {isEditingKgPerPerson ? (
+                    <form
+                      onSubmit={(e) => {
+                        e.preventDefault();
+                        const parsed = parseAmountInput(kgPerPersonDraft);
+                        if (parsed > 0) {
+                          const defaultKg = getDefaultKgPerPerson(detailEvent.serviceType);
+                          onUpdateEventKgPerPerson(
+                            detailEvent.id,
+                            parsed === defaultKg ? undefined : parsed,
+                          );
+                        }
+                        setIsEditingKgPerPerson(false);
+                      }}
+                      className="mt-2 flex items-center gap-2"
+                    >
+                      <input
+                        type="text"
+                        inputMode="decimal"
+                        autoFocus
+                        value={kgPerPersonDraft}
+                        onChange={(event) =>
+                          setKgPerPersonDraft(
+                            normalizeAmountDraft(event.target.value),
+                          )
+                        }
+                        onKeyDown={(event) => {
+                          if (event.key === "Escape") {
+                            setIsEditingKgPerPerson(false);
+                          }
+                        }}
+                        className="h-9 min-w-0 flex-1 rounded-[8px] border border-zinc-200 bg-white px-3 text-lg font-bold text-zinc-950 outline-none transition focus:border-zinc-500"
+                      />
+                      <button
+                        type="submit"
+                        className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-[8px] bg-zinc-950 text-white transition hover:bg-zinc-800"
+                        aria-label="Guardar"
+                        title="Guardar"
+                      >
+                        <Save className="h-4 w-4" aria-hidden="true" />
+                      </button>
+                    </form>
+                  ) : (
+                    <p className="mt-2 text-2xl font-bold text-zinc-950">
+                      {formatAmount(
+                        detailEvent.kgPerPerson ??
+                          getDefaultKgPerPerson(detailEvent.serviceType),
+                        "kg",
+                      )}
+                    </p>
+                  )}
+                  <div className="mt-auto pt-3">
+                    {detailEvent.kgPerPerson != null ? (
+                      <span className="inline-flex items-center rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-amber-700">
+                        Personalizado
+                      </span>
+                    ) : (
+                      <p className="text-[11px] font-medium text-zinc-400">Valor estándar de receta</p>
+                    )}
+                  </div>
+                </div>
               </div>
 
               <div className="mt-3">
@@ -3304,8 +3728,8 @@ function EventsSection({
       )}
 
       {isCreatingEvent && (
-        <div className="app-modal-backdrop fixed inset-0 z-50 flex items-center justify-center bg-zinc-950/35 px-4 py-6 backdrop-blur-sm">
-          <div className="app-modal-panel max-h-full w-full max-w-[520px] overflow-y-auto rounded-[8px] border border-zinc-200 bg-white p-5 shadow-[0_24px_70px_rgba(39,39,42,0.22)]">
+        <div className="app-modal-backdrop fixed inset-0 z-50 flex items-center justify-center bg-zinc-950/35 px-4 py-6 backdrop-blur-sm md:left-[280px]" onClick={() => setIsCreatingEvent(false)}>
+          <div className="app-modal-panel max-h-full w-full max-w-[520px] overflow-y-auto rounded-[8px] border border-zinc-200 bg-white p-5 shadow-[0_24px_70px_rgba(39,39,42,0.22)]" onClick={(e) => e.stopPropagation()}>
             <div className="flex items-start justify-between gap-4">
               <SectionTitle icon={Plus} title="Crear evento" subtitle="Nuevo servicio" />
               <button
@@ -3346,7 +3770,7 @@ function EventsSection({
                   className="field-control"
                 />
               </Field>
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid gap-3 sm:grid-cols-3">
                 <Field label="Fecha">
                   <DateField
                     value={eventForm.date}
@@ -3355,6 +3779,14 @@ function EventsSection({
                         ...eventForm,
                         date: value,
                       })
+                    }
+                  />
+                </Field>
+                <Field label="Hora">
+                  <TimeField
+                    value={eventForm.time}
+                    onChange={(value) =>
+                      onEventFormChange({ ...eventForm, time: value })
                     }
                   />
                 </Field>
@@ -3374,6 +3806,117 @@ function EventsSection({
                   />
                 </Field>
               </div>
+              <Field label="Ubicación">
+                <div className="flex flex-col gap-2">
+                  {/* Empty state: two clear options */}
+                  {!eventForm.location.trim() && !showLinkInput && (
+                    <div className="grid grid-cols-2 gap-2">
+                      <button
+                        type="button"
+                        onMouseDown={(e) => { e.preventDefault(); setShowLinkInput(true); }}
+                        className="flex items-center justify-center gap-2 rounded-[12px] border border-zinc-200 bg-white py-3 text-xs font-medium text-zinc-600 hover:bg-zinc-50"
+                      >
+                        <Link2 className="h-3.5 w-3.5 text-zinc-400" />
+                        Pegar link de Maps
+                      </button>
+                      <button
+                        type="button"
+                        onMouseDown={(e) => { e.preventDefault(); setShowLocationPicker(true); }}
+                        className="flex items-center justify-center gap-2 rounded-[12px] border border-zinc-200 bg-white py-3 text-xs font-medium text-zinc-600 hover:bg-zinc-50"
+                      >
+                        <MapPin className="h-3.5 w-3.5 text-[#8f2f2b]" />
+                        Marcar en mapa
+                      </button>
+                    </div>
+                  )}
+
+                  {/* Link paste input */}
+                  {(!eventForm.location.trim() && showLinkInput) && (
+                    <div className="flex gap-2">
+                      <input
+                        type="text"
+                        autoFocus
+                        value={eventForm.location}
+                        onChange={(event) =>
+                          onEventFormChange({
+                            ...eventForm,
+                            location: event.target.value,
+                            locationLat: null,
+                            locationLng: null,
+                          })
+                        }
+                        placeholder="Pegá el link de Google Maps…"
+                        className="field-control flex-1"
+                      />
+                      <button
+                        type="button"
+                        onMouseDown={(e) => {
+                          e.preventDefault(); // stop <label> from re-focusing the input
+                          setShowLinkInput(false);
+                          onEventFormChange({ ...eventForm, location: "", locationLat: null, locationLng: null });
+                        }}
+                        className="flex shrink-0 items-center rounded-[8px] border border-zinc-200 bg-white px-2.5 py-1.5 text-xs text-zinc-500 hover:bg-zinc-50"
+                        title="Cancelar"
+                      >
+                        <X className="h-3.5 w-3.5" />
+                      </button>
+                    </div>
+                  )}
+
+                  {/* Location set — show Google Maps link prominently */}
+                  {eventForm.location.trim() && (() => {
+                    const mapsUrl = eventForm.locationLat !== null && eventForm.locationLng !== null
+                      ? `https://maps.google.com/?q=${eventForm.locationLat},${eventForm.locationLng}`
+                      : `https://maps.google.com/?q=${encodeURIComponent(eventForm.location.trim())}`;
+                    return (
+                      <div className="rounded-[12px] border border-zinc-200 bg-zinc-50 px-3 py-2.5">
+                        <div className="flex items-start gap-2">
+                          <MapPin className="mt-0.5 h-3.5 w-3.5 shrink-0 text-[#8f2f2b]" />
+                          <span className="flex-1 text-xs text-zinc-500 line-clamp-2">
+                            {eventForm.location}
+                          </span>
+                          <button
+                            type="button"
+                            onMouseDown={(e) => {
+                              e.preventDefault();
+                              onEventFormChange({ ...eventForm, location: "", locationLat: null, locationLng: null });
+                              setShowLinkInput(false);
+                            }}
+                            className="shrink-0 text-zinc-400 hover:text-zinc-600"
+                          >
+                            <X className="h-3.5 w-3.5" />
+                          </button>
+                        </div>
+                        <a
+                          href={mapsUrl}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="mt-1.5 flex items-center gap-1.5 text-xs font-semibold text-[#8f2f2b] hover:underline"
+                          onClick={(e) => e.stopPropagation()}
+                        >
+                          <ExternalLink className="h-3 w-3 shrink-0" />
+                          <span className="truncate">{mapsUrl}</span>
+                        </a>
+                      </div>
+                    );
+                  })()}
+                </div>
+              </Field>
+              {showLocationPicker && (
+                <LocationPicker
+                  initial={eventForm.location}
+                  onConfirm={(result: LocationResult) => {
+                    onEventFormChange({
+                      ...eventForm,
+                      location: result.name,
+                      locationLat: result.lat,
+                      locationLng: result.lng,
+                    });
+                    setShowLocationPicker(false);
+                  }}
+                  onClose={() => setShowLocationPicker(false)}
+                />
+              )}
               <Field label="Tipo de servicio">
                 <select
                   value={eventForm.serviceType}
@@ -3436,8 +3979,8 @@ function EventsSection({
       )}
 
       {editingEventId && (
-        <div className="app-modal-backdrop fixed inset-0 z-50 flex items-center justify-center bg-zinc-950/35 px-4 py-6 backdrop-blur-sm">
-          <div className="app-modal-panel w-full max-w-[380px] rounded-[8px] border border-zinc-200 bg-white p-5 shadow-[0_24px_70px_rgba(39,39,42,0.22)]">
+        <div className="app-modal-backdrop fixed inset-0 z-50 flex items-center justify-center bg-zinc-950/35 px-4 py-6 backdrop-blur-sm md:left-[280px]" onClick={() => setEditingEventId(null)}>
+          <div className="app-modal-panel max-h-full w-full max-w-[520px] overflow-y-auto rounded-[8px] border border-zinc-200 bg-white p-5 shadow-[0_24px_70px_rgba(39,39,42,0.22)]" onClick={(e) => e.stopPropagation()}>
             <div className="flex items-start justify-between gap-4">
               <SectionTitle
                 icon={Pencil}
@@ -3485,7 +4028,7 @@ function EventsSection({
                   className="field-control"
                 />
               </Field>
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid gap-3 sm:grid-cols-3">
                 <Field label="Fecha">
                   <DateField
                     value={editEventForm.date}
@@ -3493,6 +4036,17 @@ function EventsSection({
                       setEditEventForm({
                         ...editEventForm,
                         date: value,
+                      })
+                    }
+                  />
+                </Field>
+                <Field label="Hora">
+                  <TimeField
+                    value={editEventForm.time}
+                    onChange={(value) =>
+                      setEditEventForm({
+                        ...editEventForm,
+                        time: value,
                       })
                     }
                   />
@@ -3513,6 +4067,22 @@ function EventsSection({
                   />
                 </Field>
               </div>
+              <Field label="Ubicación">
+                <input
+                  type="text"
+                  value={editEventForm.location}
+                  onChange={(event) =>
+                    setEditEventForm({
+                      ...editEventForm,
+                      location: event.target.value,
+                      locationLat: null,
+                      locationLng: null,
+                    })
+                  }
+                  placeholder="Dirección o link de Google Maps"
+                  className="field-control"
+                />
+              </Field>
               <Field label="Tipo de servicio">
                 <select
                   value={editEventForm.serviceType}
@@ -3530,6 +4100,23 @@ function EventsSection({
                     </option>
                   ))}
                 </select>
+              </Field>
+              <Field label="Kg/persona">
+                <input
+                  type="text"
+                  inputMode="decimal"
+                  value={editEventForm.kgPerPerson}
+                  onChange={(event) =>
+                    setEditEventForm({
+                      ...editEventForm,
+                      kgPerPerson: normalizeAmountDraft(event.target.value),
+                    })
+                  }
+                  placeholder={`Estándar ${formatAmountInputValue(
+                    getDefaultKgPerPerson(editEventForm.serviceType),
+                  )}`}
+                  className="field-control"
+                />
               </Field>
               <Field label="Estado">
                 <select
@@ -3579,27 +4166,52 @@ function EventsSection({
 
 function EventMetricCard({
   compact = false,
+  detail,
+  icon: Icon,
   label,
+  tone,
   value,
 }: {
   compact?: boolean;
+  detail?: string;
+  icon?: typeof Gauge;
   label: string;
+  tone?: string;
   value: string;
 }) {
+  if (compact) {
+    return (
+      <div className="rounded-[8px] border border-zinc-200 bg-white px-4 py-3 shadow-[0_8px_24px_rgba(39,39,42,0.04)]">
+        <p className="text-[11px] font-bold uppercase tracking-[0.02em] text-zinc-500">
+          {label}
+        </p>
+        <p className="mt-1.5 line-clamp-2 text-sm font-semibold leading-5 text-zinc-700">
+          {value}
+        </p>
+      </div>
+    );
+  }
+
   return (
-    <div className="rounded-[8px] border border-zinc-200 bg-white px-4 py-3 shadow-[0_8px_24px_rgba(39,39,42,0.04)]">
-      <p className="text-[11px] font-bold uppercase tracking-[0.02em] text-zinc-500">
-        {label}
-      </p>
-      <p
-        className={`mt-1.5 ${
-          compact
-            ? "line-clamp-2 text-sm font-semibold leading-5 text-zinc-700"
-            : "text-2xl font-bold text-zinc-950"
-        }`}
-      >
-        {value}
-      </p>
+    <div className="flex flex-col rounded-[8px] border border-zinc-200 bg-white p-4 shadow-[0_8px_24px_rgba(39,39,42,0.04)]">
+      <div className="flex items-start justify-between gap-3">
+        <p className="text-[11px] font-bold uppercase tracking-[0.02em] text-zinc-500">
+          {label}
+        </p>
+        {Icon && tone && (
+          <div
+            className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-[8px] ${tone}`}
+          >
+            <Icon className="h-4 w-4" aria-hidden="true" />
+          </div>
+        )}
+      </div>
+      <p className="mt-2 text-2xl font-bold text-zinc-950">{value}</p>
+      {detail && (
+        <p className="mt-auto pt-3 text-[11px] font-medium text-zinc-400">
+          {detail}
+        </p>
+      )}
     </div>
   );
 }
@@ -3659,79 +4271,139 @@ function EventProductTable({
           </tr>
         </thead>
         <tbody>
-          {needs.map((need) => {
-            const returnEntry = getDraftReturnEntry(need.product.id, returnLog);
-            const consumed = clampAmount(
-              Math.max(need.total - returnEntry.returned, 0),
-            );
-            const visual = getProductVisual(need.product);
+          {(() => {
+            const needGroups = [
+              {
+                id: "frigorifico",
+                label: "Frigorífico",
+                icon: Refrigerator,
+                needs: needs.filter(
+                  (n) =>
+                    n.product.category === "Carnes" ||
+                    n.product.category === "Embutidos",
+                ),
+              },
+              {
+                id: "despensa",
+                label: "Despensa",
+                icon: Utensils,
+                needs: needs.filter((n) => n.product.category === "Despensa"),
+              },
+              {
+                id: "inventario",
+                label: "Inventario",
+                icon: ClipboardList,
+                needs: needs.filter(
+                  (n) => n.product.category === "Inventario",
+                ),
+              },
+            ].filter((g) => g.needs.length > 0);
+            const hasMultipleGroups = needGroups.length > 1;
+            return needGroups.map((group) => {
+              const GroupIcon = group.icon;
+              return (
+                <Fragment key={group.id}>
+                  {hasMultipleGroups && (
+                    <tr>
+                      <td colSpan={7} className="bg-zinc-50 px-3 py-3">
+                        <div className="flex items-center gap-2">
+                          <GroupIcon
+                            className="h-4 w-4 text-zinc-500"
+                            aria-hidden="true"
+                          />
+                          <p className="text-xs font-bold uppercase text-zinc-700">
+                            {group.label}
+                          </p>
+                        </div>
+                      </td>
+                    </tr>
+                  )}
+                  {group.needs.map((need) => {
+                    const returnEntry = getDraftReturnEntry(
+                      need.product.id,
+                      returnLog,
+                    );
+                    const consumed = clampAmount(
+                      Math.max(need.total - returnEntry.returned, 0),
+                    );
+                    const visual = getProductVisual(need.product);
 
-            return (
-              <tr key={need.product.id}>
-                <td className="w-[30%] border-b border-zinc-100 py-3">
-                  <div className="flex items-center gap-3">
-                    <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-[8px] bg-zinc-100 text-[#8f2f2b]">
-                      {visual.type === "image" ? (
-                        <Image
-                          src={visual.src}
-                          alt={visual.alt}
-                          width={24}
-                          height={24}
-                          className="h-6 w-6 object-contain"
-                        />
-                      ) : (
-                        <visual.Icon className="h-4 w-4" aria-hidden="true" />
-                      )}
-                    </div>
-                    <div className="min-w-0">
-                      <p className="truncate font-semibold text-zinc-950">
-                        {need.product.name}
-                      </p>
-                      <p className="mt-1 text-xs font-medium text-zinc-500">
-                        {need.share
-                          ? `${formatShare(need.share)}%`
-                          : "Por persona"}
-                      </p>
-                    </div>
-                  </div>
-                </td>
-                <td className="w-[14%] border-b border-zinc-100 py-3 text-center text-zinc-600">
-                  {need.source ?? serviceLabel}
-                </td>
-                <td className="w-[13%] border-b border-zinc-100 py-3 text-center text-zinc-700">
-                  {formatAmount(need.base + need.preventive, need.product.unit)}
-                </td>
-                <td className="w-[13%] border-b border-zinc-100 py-3">
-                  <QuantityInput
-                    ariaLabel={`Cantidad a llevar de ${need.product.name}`}
-                    value={need.total}
-                    onChange={(value) => onUpdatePlan(need, value)}
-                  />
-                </td>
-                <td className="w-[13%] border-b border-zinc-100 py-3">
-                  <QuantityInput
-                    ariaLabel={`Cantidad que volvió de ${need.product.name}`}
-                    value={returnEntry.returned}
-                    onChange={(value) => onUpdateReturn(need, value)}
-                  />
-                </td>
-                <td className="w-[13%] border-b border-zinc-100 py-3 text-center font-semibold text-zinc-950">
-                  {formatAmount(consumed, need.product.unit)}
-                </td>
-                <td className="w-[4%] border-b border-zinc-100 py-3 text-right">
-                  <button
-                    type="button"
-                    onClick={() => onRemoveProduct(need.product.id)}
-                    className="inline-flex h-8 w-8 items-center justify-center rounded-[8px] text-zinc-400 transition hover:bg-red-50 hover:text-red-700"
-                    aria-label={`Quitar ${need.product.name} del evento`}
-                    title="Quitar producto"
-                  >
-                    <Trash2 className="h-4 w-4" aria-hidden="true" />
-                  </button>
-                </td>
-              </tr>
-            );
-          })}
+                    return (
+                      <tr key={need.product.id}>
+                        <td className="w-[30%] border-b border-zinc-100 py-3">
+                          <div className="flex items-center gap-3">
+                            <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-[8px] bg-zinc-100 text-[#8f2f2b]">
+                              {visual.type === "image" ? (
+                                <Image
+                                  src={visual.src}
+                                  alt={visual.alt}
+                                  width={24}
+                                  height={24}
+                                  className="h-6 w-6 object-contain"
+                                />
+                              ) : (
+                                <visual.Icon
+                                  className="h-4 w-4"
+                                  aria-hidden="true"
+                                />
+                              )}
+                            </div>
+                            <div className="min-w-0">
+                              <p className="truncate font-semibold text-zinc-950">
+                                {need.product.name}
+                              </p>
+                              <p className="mt-1 text-xs font-medium text-zinc-500">
+                                {need.share
+                                  ? `${formatShare(need.share)}%`
+                                  : "Por persona"}
+                              </p>
+                            </div>
+                          </div>
+                        </td>
+                        <td className="w-[14%] border-b border-zinc-100 py-3 text-center text-zinc-600">
+                          {need.source ?? serviceLabel}
+                        </td>
+                        <td className="w-[13%] border-b border-zinc-100 py-3 text-center text-zinc-700">
+                          {formatAmount(
+                            need.base + need.preventive,
+                            need.product.unit,
+                          )}
+                        </td>
+                        <td className="w-[13%] border-b border-zinc-100 py-3">
+                          <QuantityInput
+                            ariaLabel={`Cantidad a llevar de ${need.product.name}`}
+                            value={need.total}
+                            onChange={(value) => onUpdatePlan(need, value)}
+                          />
+                        </td>
+                        <td className="w-[13%] border-b border-zinc-100 py-3">
+                          <QuantityInput
+                            ariaLabel={`Cantidad que volvió de ${need.product.name}`}
+                            value={returnEntry.returned}
+                            onChange={(value) => onUpdateReturn(need, value)}
+                          />
+                        </td>
+                        <td className="w-[13%] border-b border-zinc-100 py-3 text-center font-semibold text-zinc-950">
+                          {formatAmount(consumed, need.product.unit)}
+                        </td>
+                        <td className="w-[4%] border-b border-zinc-100 py-3 text-right">
+                          <button
+                            type="button"
+                            onClick={() => onRemoveProduct(need.product.id)}
+                            className="inline-flex h-8 w-8 items-center justify-center rounded-[8px] text-zinc-400 transition hover:bg-red-50 hover:text-red-700"
+                            aria-label={`Quitar ${need.product.name} del evento`}
+                            title="Quitar producto"
+                          >
+                            <Trash2 className="h-4 w-4" aria-hidden="true" />
+                          </button>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </Fragment>
+              );
+            });
+          })()}
         </tbody>
       </table>
     </div>
@@ -3795,17 +4467,75 @@ function QuantityInput({
   );
 }
 
+function groupStockProducts(
+  products: Product[],
+  groups?: StockProductGroup[],
+): Array<StockProductGroup & { products: Product[] }> {
+  if (!groups || groups.length === 0) {
+    return [
+      {
+        description: "",
+        icon: PackageCheck,
+        id: "todos",
+        label: "Productos",
+        productIds: products.map((product) => product.id),
+        products,
+      },
+    ];
+  }
+
+  const productById = new Map(products.map((product) => [product.id, product]));
+  const assignedProductIds = new Set<string>();
+  const groupedProducts = groups
+    .map((group) => {
+      const groupProducts = group.productIds
+        .map((productId) => productById.get(productId))
+        .filter((product): product is Product => Boolean(product));
+
+      groupProducts.forEach((product) => assignedProductIds.add(product.id));
+
+      return {
+        ...group,
+        products: groupProducts,
+      };
+    })
+    .filter((group) => group.products.length > 0);
+  const otherProducts = products.filter(
+    (product) => !assignedProductIds.has(product.id),
+  );
+
+  if (otherProducts.length > 0) {
+    groupedProducts.push({
+      description: "Productos pendientes de clasificar.",
+      icon: PackageCheck,
+      id: "otros",
+      label: "Otros",
+      productIds: otherProducts.map((product) => product.id),
+      products: otherProducts,
+    });
+  }
+
+  return groupedProducts;
+}
+
 function StockTableRow({
+  categoryLabel,
   onOpen,
   product,
   reservedStock,
 }: {
+  categoryLabel: string;
   onOpen: () => void;
   product: Product;
   reservedStock: number;
 }) {
   const visual = getProductVisual(product);
-  const availableStock = roundAmount(product.currentStock - reservedStock);
+  const availableStock = roundAmount(
+    Math.max(product.currentStock - reservedStock, 0),
+  );
+  const missingStock = roundAmount(
+    Math.max(reservedStock - product.currentStock, 0),
+  );
   const stockBadge = getStockBadge(availableStock);
 
   return (
@@ -3850,7 +4580,7 @@ function StockTableRow({
         </div>
       </td>
       <td className="w-28 border-b border-zinc-100 py-3 text-center text-zinc-700">
-        {product.category}
+        {categoryLabel}
       </td>
       <td className="w-24 border-b border-zinc-100 py-3 text-center">
         <span className="inline-flex items-center gap-1.5 rounded-[8px] border border-zinc-200 bg-zinc-50 px-2 py-1.5 text-sm font-semibold text-zinc-950">
@@ -3868,6 +4598,23 @@ function StockTableRow({
         <span className="inline-flex items-center gap-1.5 rounded-[8px] border border-emerald-200 bg-emerald-50 px-2 py-1.5 text-sm font-semibold text-emerald-900">
           <Scale className="h-3 w-3 text-emerald-700" aria-hidden="true" />
           {formatAmount(availableStock, product.unit)}
+        </span>
+      </td>
+      <td className="w-24 border-b border-zinc-100 py-3 text-center">
+        <span
+          className={`inline-flex items-center gap-1.5 rounded-[8px] border px-2 py-1.5 text-sm font-semibold ${
+            missingStock > 0
+              ? "border-red-200 bg-red-50 text-red-800"
+              : "border-zinc-200 bg-zinc-50 text-zinc-500"
+          }`}
+        >
+          <AlertTriangle
+            className={`h-3 w-3 ${
+              missingStock > 0 ? "text-red-700" : "text-zinc-400"
+            }`}
+            aria-hidden="true"
+          />
+          {formatAmount(missingStock, product.unit)}
         </span>
       </td>
     </tr>
@@ -3898,7 +4645,12 @@ function StockDetailModal({
   const [manualStockValue, setManualStockValue] = useState(
     formatAmountInputValue(product.currentStock),
   );
-  const availableStock = roundAmount(product.currentStock - reservedStock);
+  const availableStock = roundAmount(
+    Math.max(product.currentStock - reservedStock, 0),
+  );
+  const missingStock = roundAmount(
+    Math.max(reservedStock - product.currentStock, 0),
+  );
   const incomingMovements = movements.filter(
     (movement) => movement.type === "entrada",
   );
@@ -3945,7 +4697,7 @@ function StockDetailModal({
                   {product.name}
                 </h2>
                 <p className="mt-1 text-sm font-medium text-zinc-500">
-                  Historial de frigorífico, reservas y disponibilidad
+                  Historial, reservas, disponibilidad y faltantes
                 </p>
               </div>
             </div>
@@ -3962,8 +4714,8 @@ function StockDetailModal({
         </div>
 
         <div className="min-h-0 flex-1 overflow-y-auto px-5 py-5 sm:px-6">
-          <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
-            <div className="relative rounded-[8px] border border-zinc-200 bg-white px-4 py-3 shadow-[0_8px_24px_rgba(39,39,42,0.04)]">
+          <div className="grid gap-3 md:grid-cols-4">
+            <div className="relative flex flex-col rounded-[8px] border border-zinc-200 bg-white p-4 shadow-[0_8px_24px_rgba(39,39,42,0.04)]">
               <button
                 type="button"
                 onClick={() =>
@@ -4004,27 +4756,38 @@ function StockDetailModal({
                   </button>
                 </form>
               ) : (
-                <p className="mt-1.5 pr-9 text-2xl font-bold text-zinc-950">
+                <p className="mt-2 pr-9 text-2xl font-bold text-zinc-950">
                   {formatAmount(product.currentStock, product.unit)}
                 </p>
               )}
+              <p className="mt-auto pt-3 text-[11px] font-medium text-zinc-400">
+                Stock total registrado
+              </p>
             </div>
             <EventMetricCard
               label="Reservado"
               value={formatAmount(reservedStock, product.unit)}
+              icon={CalendarDays}
+              tone="bg-[#fef3ee] text-[#a35612]"
+              detail="Comprometido en eventos"
             />
             <EventMetricCard
               label="Disponible"
               value={formatAmount(availableStock, product.unit)}
+              icon={PackageCheck}
+              tone="bg-[#edf7f1] text-[#2f6b4f]"
+              detail="Listo para despacho"
             />
             <EventMetricCard
-              compact={stockWithoutHistory > 0}
-              label="Sin historial"
-              value={
-                stockWithoutHistory > 0
-                  ? `${formatAmount(stockWithoutHistory, product.unit)} ya existía antes del registro local.`
-                  : "Todo el stock tiene movimiento registrado."
+              label="Falta"
+              value={formatAmount(missingStock, product.unit)}
+              icon={AlertTriangle}
+              tone={
+                missingStock > 0
+                  ? "bg-red-50 text-red-700"
+                  : "bg-zinc-100 text-zinc-500"
               }
+              detail="Necesario para cubrir reservas"
             />
           </div>
 
@@ -4038,6 +4801,7 @@ function StockDetailModal({
               onDeleteMovement={onDeleteStockMovement}
               title="Entró"
               tone="text-emerald-700"
+              unit={product.unit}
             />
             <StockMovementList
               amountTone="border-red-200 bg-red-50 text-red-800"
@@ -4048,11 +4812,13 @@ function StockDetailModal({
               onDeleteMovement={onDeleteStockMovement}
               title="Salió"
               tone="text-red-700"
+              unit={product.unit}
             />
             <StockReservationList
               emptyText="No hay eventos reservando este producto."
               entries={reservedEntries}
               title="Reservado"
+              unit={product.unit}
             />
           </div>
         </div>
@@ -4092,6 +4858,7 @@ function StockMovementList({
   onDeleteMovement,
   title,
   tone,
+  unit,
 }: {
   amountTone: string;
   emptyText: string;
@@ -4101,6 +4868,7 @@ function StockMovementList({
   onDeleteMovement?: (movementId: string) => void;
   title: string;
   tone: string;
+  unit: ProductUnit;
 }) {
   return (
     <div className="rounded-[8px] border border-zinc-200 bg-white">
@@ -4122,7 +4890,7 @@ function StockMovementList({
                   <p
                     className={`inline-flex whitespace-nowrap rounded-[8px] border px-2 py-1 text-sm font-bold ${amountTone}`}
                   >
-                    {formatAmount(movement.amount, "kg")}
+                    {formatAmount(movement.amount, unit)}
                   </p>
                   <p className="min-w-0 text-right text-xs font-semibold leading-5 text-zinc-500">
                     {movementEvent
@@ -4174,10 +4942,12 @@ function StockReservationList({
   emptyText,
   entries,
   title,
+  unit,
 }: {
   emptyText: string;
   entries: StockReservationEntry[];
   title: string;
+  unit: ProductUnit;
 }) {
   return (
     <div className="rounded-[8px] border border-zinc-200 bg-white">
@@ -4194,7 +4964,7 @@ function StockReservationList({
             >
               <div className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1">
                 <p className="inline-flex whitespace-nowrap rounded-[8px] border border-amber-200 bg-amber-50 px-2 py-1 text-sm font-bold text-amber-900">
-                  {formatAmount(entry.amount, "kg")}
+                  {formatAmount(entry.amount, unit)}
                 </p>
                 <p className="min-w-0 text-right text-xs font-semibold leading-5 text-zinc-500">
                   {formatEventDate(entry.eventDate)}
@@ -4342,6 +5112,14 @@ function getProductVisual(
     };
   }
 
+  if (product.id === "costilla" || product.id === "costilla-cerdo") {
+    return {
+      type: "image",
+      src: "https://cdn.pixabay.com/photo/2014/12/21/23/24/spare-ribs-575310_1280.png",
+      alt: "Costilla",
+    };
+  }
+
   if (product.id === "matambrito-cerdo") {
     return {
       type: "image",
@@ -4374,15 +5152,55 @@ function getProductVisual(
     };
   }
 
-  if (product.category === "Panificados") {
+  if (product.id === "sal") {
     return {
       type: "image",
-      src: "/fridge-icons/bread.webp",
-      alt: "Pan",
+      src: "https://cdn-icons-png.flaticon.com/512/10755/10755759.png",
+      alt: "Sal",
     };
   }
 
-  if (product.category === "Fuego") {
+  if (product.id === "leche-condensada") {
+    return {
+      type: "image",
+      src: "https://png.pngtree.com/png-vector/20250217/ourmid/pngtree-condensed-milk-or-cream-white-sauce-pouring-from-spoon-on-transparent-png-image_15506673.png",
+      alt: "Leche condensada",
+    };
+  }
+
+  if (product.id === "canela") {
+    return {
+      type: "image",
+      src: "https://png.pngtree.com/png-clipart/20240321/original/pngtree-cinnamon-sticks-illustration-png-image_14639470.png",
+      alt: "Canela",
+    };
+  }
+
+  if (product.id === "mbeju") {
+    return {
+      type: "image",
+      src: "https://marketplace.canva.com/TOsEk/MAF2mETOsEk/1/tl/canva-tapioca-brazil-food-illustration-MAF2mETOsEk.png",
+      alt: "Mbeju",
+    };
+  }
+
+  if (product.id === "piña") {
+    return {
+      type: "image",
+      src: "https://em-content.zobj.net/source/apple/325/pineapple_1f34d.png",
+      alt: "Piña",
+    };
+  }
+
+  if (product.id === "pan-de-ajo") {
+    return {
+      type: "image",
+      src: "/fridge-icons/bread.webp",
+      alt: "Pan de ajo",
+    };
+  }
+
+  if (product.id === "carbon") {
     return {
       type: "image",
       src: "/fridge-icons/coal.png",
@@ -4404,6 +5222,91 @@ function getProductVisual(
       src: "/fridge-icons/sopa-paraguaya.png",
       alt: "Sopa paraguaya",
     };
+  }
+
+  // Inventario — parrillas y fuego
+  if (["parrillitas", "parrilla-giragrill", "parrilla-convencional", "fogonero", "asador-en-cruz"].includes(product.id)) {
+    return { type: "image", src: "https://cdn.jsdelivr.net/gh/twitter/twemoji@14.0.2/assets/72x72/1f525.png", alt: "Parrilla" };
+  }
+  if (product.id === "espadines") {
+    return { type: "image", src: "https://cdn.jsdelivr.net/gh/twitter/twemoji@14.0.2/assets/72x72/1f362.png", alt: "Espadines" };
+  }
+  // herramientas
+  if (["palitas", "atizadores"].includes(product.id)) {
+    return { type: "image", src: "https://cdn.jsdelivr.net/gh/twitter/twemoji@14.0.2/assets/72x72/1f527.png", alt: "Herramienta" };
+  }
+  // mobiliario y estructura
+  if (product.id === "toldo") {
+    return { type: "image", src: "https://cdn.jsdelivr.net/gh/twitter/twemoji@14.0.2/assets/72x72/26fa.png", alt: "Toldo" };
+  }
+  if (product.id === "mesas") {
+    return { type: "image", src: "https://static.vecteezy.com/system/resources/thumbnails/042/053/010/small/ai-generated-wooden-table-hand-drawn-cartoon-style-illustration-free-png.png", alt: "Mesas" };
+  }
+  // electricidad
+  if (product.id === "triple") {
+    return { type: "image", src: "https://png.pngtree.com/png-vector/20241105/ourmid/pngtree-portable-travel-adapter-with-dual-plug-options-suitable-for-global-and-png-image_14276109.png", alt: "Triple" };
+  }
+  if (product.id === "alargue") {
+    return { type: "image", src: "https://cdn.jsdelivr.net/gh/twitter/twemoji@14.0.2/assets/72x72/1f50c.png", alt: "Electricidad" };
+  }
+  if (["focos", "portafoco"].includes(product.id)) {
+    return { type: "image", src: "https://cdn.jsdelivr.net/gh/twitter/twemoji@14.0.2/assets/72x72/1f4a1.png", alt: "Luz" };
+  }
+  // utensilios
+  if (product.id === "tablas-de-picar") {
+    return { type: "image", src: "https://png.pngtree.com/png-clipart/20241215/original/pngtree-wooden-cutting-board-png-image_17861693.png", alt: "Tabla de picar" };
+  }
+  if (["bandejas-metalicas", "bandeja-espeto"].includes(product.id)) {
+    return { type: "image", src: "https://cdn.jsdelivr.net/gh/twitter/twemoji@14.0.2/assets/72x72/1f37d.png", alt: "Bandeja" };
+  }
+  if (["cuchillo-espeto", "cuchillo-largo", "cuchillo-de-mesa"].includes(product.id)) {
+    return { type: "image", src: "https://cdn.jsdelivr.net/gh/twitter/twemoji@14.0.2/assets/72x72/1f52a.png", alt: "Cuchillo" };
+  }
+  if (["tenedor-espeto", "tenedor-largo"].includes(product.id)) {
+    return { type: "image", src: "https://cdn.jsdelivr.net/gh/twitter/twemoji@14.0.2/assets/72x72/1f374.png", alt: "Tenedor" };
+  }
+  if (["cucharas", "cucharas-anchas"].includes(product.id)) {
+    return { type: "image", src: "https://cdn.jsdelivr.net/gh/twitter/twemoji@14.0.2/assets/72x72/1f944.png", alt: "Cuchara" };
+  }
+  if (product.id === "pailas") {
+    return { type: "image", src: "https://cdn.jsdelivr.net/gh/twitter/twemoji@14.0.2/assets/72x72/1f373.png", alt: "Paila" };
+  }
+  if (product.id === "pinzas") {
+    return { type: "image", src: "https://cdn.jsdelivr.net/gh/twitter/twemoji@14.0.2/assets/72x72/1f962.png", alt: "Pinzas" };
+  }
+  // almacenamiento y limpieza
+  if (product.id === "bandeja-isopor") {
+    return { type: "image", src: "https://png.pngtree.com/png-vector/20240530/ourmid/pngtree-white-empty-blank-styrofoam-plastic-food-tray-png-image_12551911.png", alt: "Bandeja de isopor" };
+  }
+  if (product.id === "caja-negra") {
+    return { type: "image", src: "https://inplastic.mx/wp-content/uploads/2025/02/10_04_2024_06_15_03_491___VEU0035.006.png", alt: "Caja negra" };
+  }
+  if (product.id === "trapos") {
+    return { type: "image", src: "https://cdn.jsdelivr.net/gh/twitter/twemoji@14.0.2/assets/72x72/1f9f9.png", alt: "Trapos" };
+  }
+  if (product.id === "delantales") {
+    return { type: "image", src: "https://cdn.jsdelivr.net/gh/twitter/twemoji@14.0.2/assets/72x72/1f97c.png", alt: "Delantales" };
+  }
+  if (product.id === "bachas") {
+    return { type: "image", src: "https://cdn.jsdelivr.net/gh/twitter/twemoji@14.0.2/assets/72x72/1faa3.png", alt: "Bachas" };
+  }
+  // servicio y descartables
+  if (["escarbadientes-cortos", "escarbadientes-largos"].includes(product.id)) {
+    return { type: "image", src: "https://cdn.jsdelivr.net/gh/twitter/twemoji@14.0.2/assets/72x72/1f9b7.png", alt: "Escarbadientes" };
+  }
+  if (product.id === "servilletas") {
+    return { type: "image", src: "https://png.pngtree.com/png-vector/20240716/ourmid/pngtree-sophisticated-folded-napkin-design-for-formal-event-png-image_13120508.png", alt: "Servilletas" };
+  }
+  if (product.id === "stickers") {
+    return { type: "image", src: "https://cdn.jsdelivr.net/gh/twitter/twemoji@14.0.2/assets/72x72/1f3f7.png", alt: "Stickers" };
+  }
+
+  if (product.category === "Inventario") {
+    return { type: "icon", Icon: ClipboardList };
+  }
+
+  if (product.category === "Despensa") {
+    return { type: "icon", Icon: PackageCheck };
   }
 
   return { type: "icon", Icon: ChefHat };
@@ -4553,46 +5456,135 @@ function getEventNeedsWhatsappUrl(event: CateringEvent, needs: EventNeed[]) {
   const icons = {
     box: String.fromCodePoint(0x1f4e6),
     calendar: String.fromCodePoint(0x1f4c5),
-    fire: String.fromCodePoint(0x1f525),
+    clock: String.fromCodePoint(0x1f553),
+    fire: String.fromCodePoint(0x1f4cb),
+    location: String.fromCodePoint(0x1f4cd),
     people: String.fromCodePoint(0x1f465),
   };
-  const sortedNeeds = [...needs]
-    .filter((need) => need.total > 0 && isVisibleProduct(need.product))
-    .sort((first, second) => second.total - first.total);
+  const locationUrl =
+    event.locationLat !== undefined && event.locationLng !== undefined
+      ? `https://maps.google.com/?q=${event.locationLat},${event.locationLng}`
+      : event.location
+        ? `https://maps.google.com/?q=${encodeURIComponent(event.location)}`
+        : null;
+  const locationText =
+    event.location?.trim() ||
+    (locationUrl ? "Ver ubicación en Maps" : "Sin ubicación cargada");
+  const timeText = event.time?.trim() || "Sin hora cargada";
+  const visibleNeeds = needs.filter((need) => need.total > 0);
+  const groupedNeeds = whatsappNeedGroupConfigs
+    .map((group) => ({
+      ...group,
+      needs: visibleNeeds.filter(
+        (need) => getWhatsappNeedGroupId(event, need) === group.id,
+      ),
+    }))
+    .filter((group) => group.needs.length > 0);
   const needsText =
-    sortedNeeds.length > 0
-      ? sortedNeeds
-          .map(
-            (need) =>
-              `• *${formatAmount(
-                need.total,
-                need.product.unit,
-              )}* - ${need.product.name}`,
-          )
-          .join("\n")
+    groupedNeeds.length > 0
+      ? groupedNeeds.map(formatWhatsappNeedGroup).join("\n\n")
       : "Sin necesidades cargadas.";
   const message = [
-    `${icons.fire} *Necesidades para ${formatEventNameDisplay(
-      event.name,
-    )}*`,
-    "",
+    `${icons.fire} *Necesidades para ${formatEventNameDisplay(event.name)}*`,
     `${icons.calendar} *Fecha:* ${formatEventDate(event.date)}`,
+    `${icons.clock} *Hora del evento:* ${timeText}`,
+    `${icons.location} *Ubicación:* ${locationUrl ?? locationText}`,
     `${icons.people} *Personas:* ${event.people}`,
-    `*Servicio:* ${serviceTypeCopy[event.serviceType]}`,
-    event.manager ? `*Encargado:* ${formatPersonName(event.manager)}` : "",
     "",
-    `${icons.box} *Lista a preparar:*`,
+    `*Servicio:* ${serviceTypeCopy[event.serviceType]}`,
+    event.manager ? `*Encargado:* ${formatPersonName(event.manager)}` : null,
+    "",
+    `${icons.box} *Lista para sacar y preparar:*`,
     needsText,
     "",
     "Confirmame si ajustamos alguna cantidad.",
   ]
-    .filter((line) => line !== "")
+    .filter((line) => line !== null)
     .join("\n");
   const whatsappUrl = `/api/share-message?text=${encodeURIComponent(
     message,
   )}`;
 
   return whatsappUrl;
+}
+
+type WhatsappNeedGroupId = "entry" | "main" | "other";
+
+const whatsappNeedGroupConfigs: Array<{
+  id: WhatsappNeedGroupId;
+  title: string;
+  totalLabel: string;
+}> = [
+  {
+    id: "entry",
+    title: "Parrillitas de entrada",
+    totalLabel: "Total kg parrillitas entrada",
+  },
+  {
+    id: "main",
+    title: "Plato principal / asado completo",
+    totalLabel: "Total kg plato principal",
+  },
+  {
+    id: "other",
+    title: "Otros productos de despensa",
+    totalLabel: "Total kg otros",
+  },
+];
+
+function getWhatsappNeedGroupId(
+  event: CateringEvent,
+  need: EventNeed,
+): WhatsappNeedGroupId {
+  if (need.source === "Parrillita previa") {
+    return "entry";
+  }
+
+  if (need.source === "Catering asado") {
+    return "main";
+  }
+
+  if (
+    event.serviceType === "picada" &&
+    (need.product.category === "Carnes" || need.product.category === "Embutidos")
+  ) {
+    return "entry";
+  }
+
+  return "other";
+}
+
+function formatWhatsappNeedGroup(group: {
+  needs: EventNeed[];
+  title: string;
+  totalLabel: string;
+}): string {
+  const kgTotal = clampAmount(
+    group.needs.reduce(
+      (total, need) =>
+        need.product.unit === "kg" ? total + need.total : total,
+      0,
+    ),
+  );
+  const unitTotal = clampAmount(
+    group.needs.reduce(
+      (total, need) =>
+        need.product.unit === "un" ? total + need.total : total,
+      0,
+    ),
+  );
+  const totalsText = [
+    kgTotal > 0 ? `_${group.totalLabel}: ${formatAmount(kgTotal, "kg")} aproximadamente_` : "",
+    unitTotal > 0 ? `_Total unidades: ${formatAmount(unitTotal, "un")}_` : "",
+  ].filter(Boolean);
+  const needLines = group.needs.map(
+    (need) =>
+      `• *${formatAmount(need.total, need.product.unit)}* - ${
+        need.product.name
+      }`,
+  );
+
+  return [`*${group.title}*`, ...totalsText, ...needLines].join("\n");
 }
 
 function formatCalendarDate(value: string): string {
@@ -4669,23 +5661,25 @@ function StatCard({
   detail,
   icon: Icon,
   label,
+  smallValue,
   tone,
   value,
 }: {
   detail: string;
   icon: typeof Gauge;
   label: string;
+  smallValue?: boolean;
   tone: string;
   value: string;
 }) {
   return (
     <article className="app-card-enter flex min-h-[158px] flex-col rounded-[8px] border border-zinc-200 bg-white p-5 shadow-[0_18px_40px_rgba(39,39,42,0.06)]">
       <div className="flex items-start justify-between gap-4">
-        <div>
+        <div className="min-w-0">
           <p className="text-sm font-semibold text-zinc-500">{label}</p>
-          <p className="mt-3 text-3xl font-bold text-zinc-950">{value}</p>
+          <p className={`mt-3 font-bold text-zinc-950 ${smallValue ? "line-clamp-2 text-base leading-snug" : "truncate text-3xl"}`}>{value}</p>
         </div>
-        <div className={`flex h-11 w-11 items-center justify-center rounded-[8px] ${tone}`}>
+        <div className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-[8px] ${tone}`}>
           <Icon className="h-5 w-5" aria-hidden="true" />
         </div>
       </div>
@@ -4807,6 +5801,31 @@ function normalizeEventDateInput(value: string): string | null {
   return isValidDateParts(day, month, year) ? `${year}-${month}-${day}` : null;
 }
 
+function normalizeEventTimeInput(value: string): string | undefined {
+  const match = /^(\d{1,2}):(\d{1,2})$/.exec(value.trim());
+
+  if (!match) {
+    return undefined;
+  }
+
+  const [, rawHours, rawMinutes] = match;
+  const hours = Number(rawHours);
+  const minutes = Number(rawMinutes);
+
+  if (
+    !Number.isInteger(hours) ||
+    !Number.isInteger(minutes) ||
+    hours < 0 ||
+    hours > 23 ||
+    minutes < 0 ||
+    minutes > 59
+  ) {
+    return undefined;
+  }
+
+  return `${String(hours).padStart(2, "0")}:${String(minutes).padStart(2, "0")}`;
+}
+
 function formatDateForForm(value: string): string {
   const normalizedDate = normalizeEventDateInput(value);
 
@@ -4922,6 +5941,114 @@ function Field({
   );
 }
 
+function TimeField({
+  onChange,
+  value,
+}: {
+  onChange: (value: string) => void;
+  value: string;
+}) {
+  const hhRef = useRef<HTMLInputElement>(null);
+  const mmRef = useRef<HTMLInputElement>(null);
+  const parts = value.includes(":") ? value.split(":") : ["", ""];
+  const hh = parts[0] ?? "";
+  const mm = parts[1] ?? "";
+
+  function clamp(n: number, min: number, max: number) {
+    return Math.max(min, Math.min(max, n));
+  }
+
+  function handleHH(raw: string) {
+    const digits = raw.replace(/\D/g, "").slice(0, 2);
+    onChange(`${digits}:${mm}`);
+    if (digits.length === 2) mmRef.current?.select();
+  }
+
+  function handleMM(raw: string) {
+    const digits = raw.replace(/\D/g, "").slice(0, 2);
+    onChange(`${hh}:${digits}`);
+  }
+
+  function blurHH() {
+    // Read from DOM ref — the React state (hh) may be stale when blur fires
+    // immediately after select() is called on the other input.
+    const raw = hhRef.current?.value ?? hh;
+    if (!raw) return;
+    const n = clamp(Number(raw), 0, 23);
+    const currentMM = mmRef.current?.value ?? mm;
+    onChange(`${String(n).padStart(2, "0")}:${currentMM}`);
+  }
+
+  function blurMM() {
+    const raw = mmRef.current?.value ?? mm;
+    if (!raw) return;
+    const n = clamp(Number(raw), 0, 59);
+    const currentHH = hhRef.current?.value ?? hh;
+    onChange(`${currentHH}:${String(n).padStart(2, "0")}`);
+  }
+
+  function handleHHKey(e: React.KeyboardEvent<HTMLInputElement>) {
+    if (e.key === "ArrowUp") {
+      e.preventDefault();
+      const n = clamp((Number(hh) + 1) % 24, 0, 23);
+      onChange(`${String(n).padStart(2, "0")}:${mm}`);
+    } else if (e.key === "ArrowDown") {
+      e.preventDefault();
+      const n = clamp((Number(hh) - 1 + 24) % 24, 0, 23);
+      onChange(`${String(n).padStart(2, "0")}:${mm}`);
+    } else if (e.key === ":" || e.key === "Tab") {
+      mmRef.current?.select();
+    }
+  }
+
+  function handleMMKey(e: React.KeyboardEvent<HTMLInputElement>) {
+    if (e.key === "ArrowUp") {
+      e.preventDefault();
+      const n = (Number(mm) + 1) % 60;
+      onChange(`${hh}:${String(n).padStart(2, "0")}`);
+    } else if (e.key === "ArrowDown") {
+      e.preventDefault();
+      const n = (Number(mm) - 1 + 60) % 60;
+      onChange(`${hh}:${String(n).padStart(2, "0")}`);
+    } else if (e.key === "Backspace" && mm === "") {
+      e.preventDefault();
+      hhRef.current?.select();
+    }
+  }
+
+  return (
+    <div className="time-field">
+      <input
+        ref={hhRef}
+        type="text"
+        inputMode="numeric"
+        value={hh}
+        onChange={(e) => handleHH(e.target.value)}
+        onFocus={(e) => e.target.select()}
+        onBlur={blurHH}
+        onKeyDown={handleHHKey}
+        placeholder="00"
+        maxLength={2}
+        className="time-field-part"
+      />
+      <span className="time-field-sep">:</span>
+      <input
+        ref={mmRef}
+        type="text"
+        inputMode="numeric"
+        value={mm}
+        onChange={(e) => handleMM(e.target.value)}
+        onFocus={(e) => e.target.select()}
+        onBlur={blurMM}
+        onKeyDown={handleMMKey}
+        placeholder="00"
+        maxLength={2}
+        className="time-field-part"
+      />
+    </div>
+  );
+}
+
 function DateField({
   onChange,
   value,
@@ -4932,9 +6059,20 @@ function DateField({
   const containerRef = useRef<HTMLDivElement>(null);
   const normalizedValue = normalizeEventDateInput(value) ?? "";
   const [isOpen, setIsOpen] = useState(false);
+  const [isVisible, setIsVisible] = useState(false);
   const [visibleMonth, setVisibleMonth] = useState(() =>
     getCalendarMonthDate(normalizedValue),
   );
+
+  function openCalendar() {
+    setVisibleMonth(getCalendarMonthDate(normalizedValue));
+    setIsOpen(true);
+    setIsVisible(true);
+  }
+
+  function closeCalendar() {
+    setIsOpen(false);
+  }
   const calendarDays = getCalendarDays(visibleMonth);
   const selectedDay = normalizedValue;
   const monthLabel = new Intl.DateTimeFormat("es-PY", {
@@ -4952,13 +6090,13 @@ function DateField({
         containerRef.current &&
         !containerRef.current.contains(event.target as Node)
       ) {
-        setIsOpen(false);
+        closeCalendar();
       }
     }
 
     function handleKeyDown(event: KeyboardEvent) {
       if (event.key === "Escape") {
-        setIsOpen(false);
+        closeCalendar();
       }
     }
 
@@ -4970,11 +6108,6 @@ function DateField({
       document.removeEventListener("keydown", handleKeyDown);
     };
   }, [isOpen]);
-
-  function openCalendar() {
-    setVisibleMonth(getCalendarMonthDate(normalizedValue));
-    setIsOpen(true);
-  }
 
   return (
     <div ref={containerRef} className="relative">
@@ -4997,8 +6130,15 @@ function DateField({
       >
         <CalendarDays className="h-4 w-4" aria-hidden="true" />
       </button>
-      {isOpen && (
-        <div className="app-popover absolute left-0 top-[calc(100%+0.5rem)] z-[70] w-[280px] rounded-[8px] border border-zinc-200 bg-white p-3 shadow-[0_20px_50px_rgba(39,39,42,0.18)]">
+      {isVisible && (
+        <div
+          className={`${isOpen ? "app-popover" : "app-popover-out"} absolute left-0 top-[calc(100%+0.5rem)] z-[70] w-[280px] rounded-[8px] border border-zinc-200 bg-white p-3 shadow-[0_20px_50px_rgba(39,39,42,0.18)]`}
+          onAnimationEnd={(event) => {
+            if (event.currentTarget === event.target && !isOpen) {
+              setIsVisible(false);
+            }
+          }}
+        >
           <div className="flex items-center justify-between gap-3">
             <button
               type="button"
@@ -5048,9 +6188,10 @@ function DateField({
                 <button
                   key={day.isoDate}
                   type="button"
-                  onClick={() => {
+                  onPointerDown={(e) => {
+                    e.preventDefault();
                     onChange(formatDateForForm(day.isoDate));
-                    setIsOpen(false);
+                    closeCalendar();
                   }}
                   className={`flex h-8 items-center justify-center rounded-[8px] text-sm font-semibold transition ${
                     day.isoDate === selectedDay

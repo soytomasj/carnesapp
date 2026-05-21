@@ -8,6 +8,7 @@ import {
   type ReturnEntry,
   recipeConfigs,
   sideConsumptionRules,
+  unitRatioRules,
 } from "@/lib/catering-data";
 
 export type EventNeed = {
@@ -34,7 +35,7 @@ export type UnitTotals = Partial<
 >;
 
 export function calculateEventNeeds(
-  event: Pick<CateringEvent, "people"> & {
+  event: Pick<CateringEvent, "people" | "kgPerPerson"> & {
     serviceType?: EventServiceType;
   },
   products: Product[],
@@ -42,6 +43,7 @@ export function calculateEventNeeds(
   const recipe =
     recipeConfigs.find((item) => item.id === event.serviceType) ??
     recipeConfigs[0];
+  const effectiveKgPerPerson = event.kgPerPerson ?? recipe.kgPerPerson;
   const recipeShareTotals = recipe.rules.reduce<Record<string, number>>(
     (totals, rule) => {
       const key = getRecipeRuleGroupKey(rule.source, rule.kgPerPerson);
@@ -58,7 +60,10 @@ export function calculateEventNeeds(
         return null;
       }
 
-      const groupKgPerPerson = rule.kgPerPerson ?? recipe.kgPerPerson;
+      const defaultGroupKg = rule.kgPerPerson ?? recipe.kgPerPerson;
+      const groupKgPerPerson = event.kgPerPerson != null
+        ? defaultGroupKg * (effectiveKgPerPerson / recipe.kgPerPerson)
+        : defaultGroupKg;
       const groupShareTotal =
         recipeShareTotals[getRecipeRuleGroupKey(rule.source, rule.kgPerPerson)] ??
         100;
@@ -81,7 +86,23 @@ export function calculateEventNeeds(
     })
     .filter((need): need is EventNeed => need !== null);
 
-  return [...recipeNeeds, ...sideNeeds];
+  const unitRatioNeeds = unitRatioRules
+    .map((rule) => {
+      const product = products.find((item) => item.id === rule.productId);
+      if (!product) return null;
+      const base = Math.ceil(event.people / rule.peoplePerUnit);
+      return {
+        product,
+        base,
+        preventive: 0,
+        total: base,
+        available: product.currentStock,
+        missing: Math.max(base - product.currentStock, 0),
+      } satisfies EventNeed;
+    })
+    .filter((need): need is EventNeed => need !== null);
+
+  return [...recipeNeeds, ...sideNeeds, ...unitRatioNeeds];
 }
 
 export function createDefaultReturnEntry(need: EventNeed): ReturnEntry {
@@ -203,6 +224,12 @@ function getDisplayDecimals(value: number): number {
   }
 
   return 3;
+}
+
+export function getDefaultKgPerPerson(serviceType?: EventServiceType): number {
+  const recipe =
+    recipeConfigs.find((item) => item.id === serviceType) ?? recipeConfigs[0];
+  return recipe.kgPerPerson;
 }
 
 export function formatEventDate(date: string): string {
