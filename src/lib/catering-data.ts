@@ -160,7 +160,7 @@ export const recipeConfigs: RecipeConfig[] = [
   {
     id: "espeto",
     name: "Catering asado",
-    kgPerPerson: 0.7,
+    kgPerPerson: 0.45,
     rules: [
       {
         productId: "costilla",
