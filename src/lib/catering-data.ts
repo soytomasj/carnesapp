@@ -98,7 +98,7 @@ export const mockProducts: Product[] = [
   { id: "piña",                 name: "Piña",                 category: "Despensa", unit: "un", currentStock: 0 },
   { id: "leche-condensada",     name: "Leche condensada",     category: "Despensa", unit: "un", currentStock: 0 },
   { id: "canela",               name: "Canela",               category: "Despensa", unit: "un", currentStock: 0 },
-  { id: "carbon",               name: "Carbón",               category: "Despensa", unit: "kg", currentStock: 0 },
+  { id: "carbon",               name: "Bolsa Carbón (10kg)",   category: "Despensa", unit: "un", currentStock: 0 },
   { id: "escarbadientes-cortos", name: "Escarbadientes cortos", category: "Inventario", unit: "un", currentStock: 0 },
   { id: "escarbadientes-largos", name: "Escarbadientes largos", category: "Inventario", unit: "un", currentStock: 0 },
   { id: "servilletas",          name: "Servilletas",           category: "Inventario", unit: "un", currentStock: 0 },
@@ -248,7 +248,7 @@ export const sideConsumptionRules: ConsumptionRule[] = [
   { productId: "mandioca", amountPerPerson: 0.25 },
   { productId: "sopa", amountPerPerson: 0.12 },
   { productId: "pan", amountPerPerson: 0.08 },
-  { productId: "carbon", amountPerPerson: 0.25 },
+  { productId: "carbon", amountPerPerson: 0.025 },
 ];
 
 export const unitRatioRules: UnitRatioRule[] = [

@@ -449,3 +449,13 @@ select.field-control {
 .rounded-\[8px\] {
   border-radius: 12px;
 }
+
+/* ─── Mobile safe-area helpers ──────────────────────────── */
+
+.mobile-nav-bottom {
+  padding-bottom: env(safe-area-inset-bottom, 0px);
+}
+
+.pb-safe-nav {
+  padding-bottom: calc(4.5rem + env(safe-area-inset-bottom, 0px));
+}

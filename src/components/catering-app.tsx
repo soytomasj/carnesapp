@@ -1757,7 +1757,7 @@ export default function CateringApp() {
 
         <div
           key={activeSection}
-          className="app-section-enter relative z-0 min-w-0 px-4 py-4 sm:px-6 md:ml-[280px] md:px-8 md:py-8"
+          className="app-section-enter relative z-0 min-w-0 px-4 py-4 pb-safe-nav sm:px-6 md:ml-[280px] md:px-8 md:py-8 md:pb-8"
         >
           {activeSection === "dashboard" && (
             <DashboardSection
@@ -1925,6 +1925,14 @@ function Sidebar({
   );
 }
 
+const mobileSectionLabels: Record<Section, string> = {
+  dashboard: "Inicio",
+  frigorifico: "Frigo",
+  despensa: "Despensa",
+  inventario: "Stock",
+  eventos: "Eventos",
+};
+
 function MobileNav({
   activeSection,
   onChange,
@@ -1935,31 +1943,40 @@ function MobileNav({
   syncStatus: SyncStatus;
 }) {
   return (
-    <div className="sticky top-0 z-40 border-b border-zinc-200 bg-white/90 px-4 py-3 backdrop-blur md:hidden">
-      <Brand compact syncStatus={syncStatus} />
-      <div className="mt-3 grid grid-cols-3 gap-2">
-        {sections.map((section) => {
-          const Icon = section.icon;
-          const isActive = activeSection === section.id;
-
-          return (
-            <button
-              key={section.id}
-              type="button"
-              onClick={() => onChange(section.id)}
-              className={`flex items-center justify-center gap-2 rounded-[8px] px-2 py-2 text-xs font-semibold ${
-                isActive
-                  ? "bg-[#8f2f2b] text-white"
-                  : "bg-zinc-100 text-zinc-600"
-              }`}
-            >
-              <Icon className="h-4 w-4" aria-hidden="true" />
-              <span className="truncate">{section.label}</span>
-            </button>
-          );
-        })}
+    <>
+      <div className="sticky top-0 z-40 border-b border-zinc-200 bg-white/90 px-4 py-3 backdrop-blur md:hidden">
+        <Brand compact syncStatus={syncStatus} />
       </div>
-    </div>
+      <nav
+        aria-label="Navegación principal"
+        className="mobile-nav-bottom fixed bottom-0 left-0 right-0 z-40 border-t border-zinc-200 bg-white/95 backdrop-blur md:hidden"
+      >
+        <div className="grid grid-cols-5">
+          {sections.map((section) => {
+            const Icon = section.icon;
+            const isActive = activeSection === section.id;
+
+            return (
+              <button
+                key={section.id}
+                type="button"
+                onClick={() => onChange(section.id)}
+                aria-current={isActive ? "page" : undefined}
+                className={`flex flex-col items-center justify-center gap-1 py-3 text-[10px] font-semibold transition-colors ${
+                  isActive ? "text-[#8f2f2b]" : "text-zinc-400"
+                }`}
+              >
+                <Icon
+                  className={`h-5 w-5 transition-colors ${isActive ? "text-[#8f2f2b]" : "text-zinc-400"}`}
+                  aria-hidden="true"
+                />
+                <span>{mobileSectionLabels[section.id]}</span>
+              </button>
+            );
+          })}
+        </div>
+      </nav>
+    </>
   );
 }
 
@@ -2573,7 +2590,7 @@ function FridgeSection({
           subtitle={`${products.length} productos activos`}
         />
         <div className="mt-5 overflow-x-auto">
-          <table className="w-full min-w-[780px] border-separate border-spacing-0 text-left text-sm">
+          <table className="w-full min-w-[620px] border-separate border-spacing-0 text-left text-sm">
             <thead>
               <tr className="text-xs font-semibold uppercase text-zinc-500">
                 <th className="border-b border-zinc-200 pb-3">Producto</th>
@@ -4262,7 +4279,7 @@ function EventProductTable({
 }) {
   return (
     <div className="mt-5 overflow-x-auto">
-      <table className="w-full min-w-[860px] table-fixed border-separate border-spacing-0 text-left text-sm">
+      <table className="w-full min-w-[660px] table-fixed border-separate border-spacing-0 text-left text-sm">
         <thead>
           <tr className="text-xs font-semibold uppercase text-zinc-500">
             <th className="w-[30%] border-b border-zinc-200 pb-3">Producto</th>
@@ -5218,7 +5235,7 @@ function getProductVisual(
     return {
       type: "image",
       src: "/fridge-icons/coal.png",
-      alt: "Carbón",
+      alt: "Bolsa Carbón",
     };
   }
 
@@ -5589,7 +5606,6 @@ function formatWhatsappNeedGroup(group: {
   );
   const totalsText = [
     kgTotal > 0 ? `_${group.totalLabel}: ${formatAmount(kgTotal, "kg")} aproximadamente_` : "",
-    unitTotal > 0 ? `_Total unidades: ${formatAmount(unitTotal, "un")}_` : "",
   ].filter(Boolean);
   const needLines = group.needs.map(
     (need) =>
