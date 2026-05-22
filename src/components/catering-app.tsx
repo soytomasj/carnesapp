@@ -6,6 +6,7 @@ import { DashboardSection } from "@/components/dashboard-section";
 import { FridgeSection } from "@/components/fridge-section";
 import { EventsSection } from "@/components/events-section";
 import { useCateringApp } from "@/hooks/use-catering-app";
+import type { Section } from "@/lib/catering-types";
 import { pantryProductGroups, inventarioProductGroups } from "@/lib/catering-app-constants";
 
 export default function CateringApp() {
