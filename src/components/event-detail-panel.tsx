@@ -19,7 +19,7 @@ import type { CateringEvent, EventReturnLog, Product } from "@/lib/catering-data
 import {
   formatAmount,
   formatEventDate,
-  getDefaultKgPerPerson,
+  getRecipeGroups,
   type EventNeed,
 } from "@/lib/catering-calculations";
 import type { EventProductPlanLog } from "@/lib/catering-types";
@@ -47,6 +47,7 @@ export function EventDetailPanel({
   onClose,
   onFinalizeEvent,
   onKgPerPersonSave,
+  onKgPerPersonBySourceSave,
   onRemoveProduct,
   onSaveDraft,
   onStartEditing,
@@ -69,6 +70,7 @@ export function EventDetailPanel({
   onClose: () => void;
   onFinalizeEvent: (event: CateringEvent) => void;
   onKgPerPersonSave: (draft: string) => void;
+  onKgPerPersonBySourceSave: (source: string, draft: string) => void;
   onRemoveProduct: (productId: string) => void;
   onSaveDraft: () => void;
   onStartEditing: (event: CateringEvent) => void;
@@ -76,11 +78,11 @@ export function EventDetailPanel({
   onUpdateReturn: (need: EventNeed, value: string) => void;
 }) {
   const [isAddingProduct, setIsAddingProduct] = useState(false);
-  const [isEditingKgPerPerson, setIsEditingKgPerPerson] = useState(false);
+  const [editingSource, setEditingSource] = useState<string | null>(null);
   const [kgPerPersonDraft, setKgPerPersonDraft] = useState("");
 
   useEffect(() => {
-    setIsEditingKgPerPerson(false);
+    setEditingSource(null);
   }, [detailEvent.id]);
 
   return (
@@ -181,85 +183,95 @@ export function EventDetailPanel({
               detail="Stock recuperado"
             />
             <div className="relative flex flex-col rounded-[8px] border border-zinc-200 bg-white p-4 shadow-[0_8px_24px_rgba(39,39,42,0.04)]">
-              <div className="flex items-start justify-between gap-3">
-                <div className="flex flex-col gap-1">
-                  <p className="text-[11px] font-bold uppercase tracking-[0.02em] text-zinc-500">
-                    Kg / persona
-                  </p>
-                </div>
-                <div className="flex shrink-0 items-center gap-1">
-                  <button
-                    type="button"
-                    onClick={() => {
-                      if (!isEditingKgPerPerson) {
-                        setKgPerPersonDraft(
-                          formatAmountInputValue(
-                            detailEvent.kgPerPerson ??
-                              getDefaultKgPerPerson(detailEvent.serviceType),
-                          ),
-                        );
-                      }
-                      setIsEditingKgPerPerson((v) => !v);
-                    }}
-                    className="inline-flex h-8 w-8 items-center justify-center rounded-[8px] border border-transparent text-zinc-400 transition hover:border-zinc-200 hover:bg-zinc-50 hover:text-zinc-700"
-                    aria-label="Editar kg por persona"
-                    title="Editar kg/persona"
-                  >
-                    <Pencil className="h-3.5 w-3.5" aria-hidden="true" />
-                  </button>
-                </div>
-              </div>
-              <div className="mt-2 flex h-9 items-center">
-                {isEditingKgPerPerson ? (
-                  <form
-                    onSubmit={(e) => {
-                      e.preventDefault();
-                      onKgPerPersonSave(kgPerPersonDraft);
-                      setIsEditingKgPerPerson(false);
-                    }}
-                    className="flex w-full items-center gap-2"
-                  >
-                    <input
-                      type="text"
-                      inputMode="decimal"
-                      autoFocus
-                      value={kgPerPersonDraft}
-                      onChange={(event) =>
-                        setKgPerPersonDraft(
-                          normalizeAmountDraft(event.target.value),
-                        )
-                      }
-                      onKeyDown={(event) => {
-                        if (event.key === "Escape") {
-                          setIsEditingKgPerPerson(false);
-                        }
-                      }}
-                      className="h-9 min-w-0 flex-1 rounded-[8px] border border-zinc-200 bg-white px-3 text-lg font-bold text-zinc-950 outline-none transition focus:border-zinc-500"
-                    />
-                    <button
-                      type="submit"
-                      className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-[8px] bg-zinc-950 text-white transition hover:bg-zinc-800"
-                      aria-label="Guardar"
-                      title="Guardar"
-                    >
-                      <Save className="h-4 w-4" aria-hidden="true" />
-                    </button>
-                  </form>
-                ) : (
-                  <p className="text-2xl font-bold text-zinc-950">
-                    {formatAmount(
-                      detailEvent.kgPerPerson ??
-                        getDefaultKgPerPerson(detailEvent.serviceType),
-                      "kg",
-                    )}
-                  </p>
-                )}
-              </div>
-              <div className="mt-auto pt-3">
-                <p className="text-[11px] font-medium text-zinc-400">
-                  {detailEvent.kgPerPerson != null ? "PERSONALIZADO" : "Valor estándar de receta"}
-                </p>
-              </div>
+              <p className="mb-3 text-[11px] font-bold uppercase tracking-[0.02em] text-zinc-500">
+                Kg / persona
+              </p>
+              {(() => {
+                const groups = getRecipeGroups(detailEvent.serviceType);
+                const isMultiGroup = groups.length > 1;
+                if (!isMultiGroup) {
+                  const group = groups[0]!;
+                  const currentValue = detailEvent.kgPerPerson ?? group.kgPerPerson;
+                  const isCustom = detailEvent.kgPerPerson != null;
+                  const isEditing = editingSource === group.source;
+                  return (
+                    <>
+                      <div className="mt-2 flex h-9 items-center">
+                        {isEditing ? (
+                          <form
+                            onSubmit={(e) => { e.preventDefault(); onKgPerPersonSave(kgPerPersonDraft); setEditingSource(null); }}
+                            className="flex w-full items-center gap-2"
+                          >
+                            <input
+                              type="text" inputMode="decimal" autoFocus
+                              value={kgPerPersonDraft}
+                              onChange={(e) => setKgPerPersonDraft(normalizeAmountDraft(e.target.value))}
+                              onKeyDown={(e) => { if (e.key === "Escape") setEditingSource(null); }}
+                              className="h-9 min-w-0 flex-1 rounded-[8px] border border-zinc-200 bg-white px-3 text-lg font-bold text-zinc-950 outline-none transition focus:border-zinc-500"
+                            />
+                            <button type="submit" className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-[8px] bg-zinc-950 text-white transition hover:bg-zinc-800" aria-label="Guardar">
+                              <Save className="h-4 w-4" aria-hidden="true" />
+                            </button>
+                          </form>
+                        ) : (
+                          <div className="flex w-full items-center">
+                            <p className="flex-1 text-2xl font-bold text-zinc-950">{formatAmount(currentValue, "kg")}</p>
+                            <button type="button" onClick={() => { setKgPerPersonDraft(formatAmountInputValue(currentValue)); setEditingSource(group.source); }} className="inline-flex h-8 w-8 items-center justify-center rounded-[8px] border border-transparent text-zinc-400 transition hover:border-zinc-200 hover:bg-zinc-50 hover:text-zinc-700" aria-label="Editar kg por persona">
+                              <Pencil className="h-3.5 w-3.5" aria-hidden="true" />
+                            </button>
+                          </div>
+                        )}
+                      </div>
+                      <div className="mt-auto pt-3">
+                        <p className="text-[11px] font-medium text-zinc-400">{isCustom ? "PERSONALIZADO" : "Valor estándar de receta"}</p>
+                      </div>
+                    </>
+                  );
+                }
+                return (
+                  <div className="flex flex-col gap-1">
+                    {groups.map((group) => {
+                      const currentValue = detailEvent.kgPerPersonBySource?.[group.source] ?? group.kgPerPerson;
+                      const isCustom = detailEvent.kgPerPersonBySource?.[group.source] != null;
+                      const isEditing = editingSource === group.source;
+                      return (
+                        <div key={group.source} className="flex items-center gap-2 rounded-[6px] px-2 py-1.5 hover:bg-zinc-50">
+                          <div className="min-w-0 flex-1">
+                            <p className="truncate text-[10px] font-semibold uppercase tracking-wide text-zinc-400">
+                              {group.source}
+                            </p>
+                            {isEditing ? (
+                              <form
+                                onSubmit={(e) => { e.preventDefault(); onKgPerPersonBySourceSave(group.source, kgPerPersonDraft); setEditingSource(null); }}
+                                className="mt-1 flex items-center gap-1.5"
+                              >
+                                <input
+                                  type="text" inputMode="decimal" autoFocus
+                                  value={kgPerPersonDraft}
+                                  onChange={(e) => setKgPerPersonDraft(normalizeAmountDraft(e.target.value))}
+                                  onKeyDown={(e) => { if (e.key === "Escape") setEditingSource(null); }}
+                                  className="h-8 w-full min-w-0 rounded-[6px] border border-zinc-200 bg-white px-2 text-sm font-bold text-zinc-950 outline-none transition focus:border-zinc-500"
+                                />
+                                <button type="submit" className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-[6px] bg-zinc-950 text-white transition hover:bg-zinc-800" aria-label="Guardar">
+                                  <Save className="h-3.5 w-3.5" aria-hidden="true" />
+                                </button>
+                              </form>
+                            ) : (
+                              <p className="text-base font-bold text-zinc-950">{formatAmount(currentValue, "kg")}</p>
+                            )}
+                            <p className="text-[10px] font-medium text-zinc-400">{isCustom ? "PERSONALIZADO" : "Estándar"}</p>
+                          </div>
+                          {!isEditing && (
+                            <button type="button" onClick={() => { setKgPerPersonDraft(formatAmountInputValue(currentValue)); setEditingSource(group.source); }} className="shrink-0 inline-flex h-7 w-7 items-center justify-center rounded-[6px] border border-transparent text-zinc-300 transition hover:border-zinc-200 hover:bg-white hover:text-zinc-600" aria-label="Editar kg por persona">
+                              <Pencil className="h-3 w-3" aria-hidden="true" />
+                            </button>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
+                );
+              })()}
             </div>
           </div>
 

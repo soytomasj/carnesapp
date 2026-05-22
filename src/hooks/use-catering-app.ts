@@ -915,6 +915,25 @@ export function useCateringApp() {
     );
   }
 
+  function updateEventKgPerPersonBySource(
+    eventId: string,
+    source: string,
+    value: number | undefined,
+  ) {
+    setEvents((currentEvents) =>
+      currentEvents.map((event) => {
+        if (event.id !== eventId) return event;
+        const next = { ...event.kgPerPersonBySource };
+        if (value != null) {
+          next[source] = value;
+        } else {
+          delete next[source];
+        }
+        return { ...event, kgPerPersonBySource: next };
+      }),
+    );
+  }
+
   function deleteEvent(eventId: string) {
     const remainingEvents = events.filter((event) => event.id !== eventId);
     const eventMovements = stockMovements.filter(
@@ -1275,6 +1294,7 @@ export function useCateringApp() {
     syncStatus,
     updateEvent,
     updateEventKgPerPerson,
+    updateEventKgPerPersonBySource,
     updateEventProductPlan,
     updateEventStatus,
     updateReturnEntry,

@@ -40,6 +40,7 @@ export default function CateringApp() {
     syncStatus,
     updateEvent,
     updateEventKgPerPerson,
+    updateEventKgPerPersonBySource,
     updateEventProductPlan,
     updateEventStatus,
     updateReturnEntry,
@@ -49,11 +50,8 @@ export default function CateringApp() {
 
   function handleSectionChange(section: string) {
     if (section === activeSection) return;
-    if (typeof document !== "undefined" && "startViewTransition" in document) {
-      (document as Document & { startViewTransition: (cb: () => void) => void }).startViewTransition(() => setActiveSection(section));
-    } else {
-      setActiveSection(section);
-    }
+    setActiveSection(section);
+    window.scrollTo(0, 0);
   }
 
   return (
@@ -72,6 +70,7 @@ export default function CateringApp() {
         />
 
         <div
+          key={activeSection}
           className="section-content relative z-0 min-w-0 px-4 py-4 pb-safe-nav sm:px-6 md:ml-[280px] md:px-8 md:py-8 md:pb-8"
         >
           {activeSection === "dashboard" && (
@@ -177,6 +176,7 @@ export default function CateringApp() {
               onStatusChange={updateEventStatus}
               onUpdateEvent={updateEvent}
               onUpdateEventKgPerPerson={updateEventKgPerPerson}
+              onUpdateEventKgPerPersonBySource={updateEventKgPerPersonBySource}
               products={visibleProducts}
               returnLog={returnLog}
               selectedEvent={selectedEvent}

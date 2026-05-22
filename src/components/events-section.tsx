@@ -22,6 +22,7 @@ import {
   calculateEventNeeds,
   formatEventDate,
   getDefaultKgPerPerson,
+  getRecipeGroups,
   type EventNeed,
 } from "@/lib/catering-calculations";
 import type {
@@ -78,6 +79,7 @@ export function EventsSection({
   onUpdateReturnEntry,
   onUpdateEvent,
   onUpdateEventKgPerPerson,
+  onUpdateEventKgPerPersonBySource,
   products,
   returnLog,
   selectedEvent,
@@ -111,6 +113,7 @@ export function EventsSection({
   ) => void;
   onUpdateEvent: (eventId: string, form: EventForm) => void;
   onUpdateEventKgPerPerson: (eventId: string, value: number | undefined) => void;
+  onUpdateEventKgPerPersonBySource: (eventId: string, source: string, value: number | undefined) => void;
   products: Product[];
   returnLog: EventReturnLog;
   selectedEvent?: CateringEvent;
@@ -580,14 +583,27 @@ export function EventsSection({
     setHasSavedDraft(true);
   }
 
-  function handleKgPerPersonSave(draft: string) {
+  function handleKgPerPersonSave(draft: string, source?: string) {
     if (!detailEvent) return;
     const parsed = parseAmountInput(draft);
     if (parsed <= 0) return;
-    const defaultKg = getDefaultKgPerPerson(detailEvent.serviceType);
-    const newKg = parsed === defaultKg ? undefined : parsed;
-    onUpdateEventKgPerPerson(detailEvent.id, newKg);
-    const updatedEvent = { ...detailEvent, kgPerPerson: newKg };
+    let updatedEvent: typeof detailEvent;
+    if (source) {
+      const defaultKg = getRecipeGroups(detailEvent.serviceType).find(
+        (g) => g.source === source,
+      )?.kgPerPerson;
+      const newKg = parsed === defaultKg ? undefined : parsed;
+      onUpdateEventKgPerPersonBySource(detailEvent.id, source, newKg);
+      const nextBySource = { ...detailEvent.kgPerPersonBySource };
+      if (newKg != null) nextBySource[source] = newKg;
+      else delete nextBySource[source];
+      updatedEvent = { ...detailEvent, kgPerPersonBySource: nextBySource };
+    } else {
+      const defaultKg = getDefaultKgPerPerson(detailEvent.serviceType);
+      const newKg = parsed === defaultKg ? undefined : parsed;
+      onUpdateEventKgPerPerson(detailEvent.id, newKg);
+      updatedEvent = { ...detailEvent, kgPerPerson: newKg };
+    }
     const newBaseNeeds = calculateEventNeeds(updatedEvent, products);
     const newBaseProductIds = new Set(newBaseNeeds.map((n) => n.product.id));
     setDraftProductPlan((currentPlan) => {
@@ -858,6 +874,7 @@ export function EventsSection({
           onClose={() => setDetailEventId(null)}
           onFinalizeEvent={handleFinalizeEvent}
           onKgPerPersonSave={handleKgPerPersonSave}
+          onKgPerPersonBySourceSave={(source, draft) => handleKgPerPersonSave(draft, source)}
           onRemoveProduct={removeDraftProduct}
           onSaveDraft={saveDetailDraft}
           onStartEditing={startEditingEvent}

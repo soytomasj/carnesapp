@@ -35,7 +35,7 @@ export type UnitTotals = Partial<
 >;
 
 export function calculateEventNeeds(
-  event: Pick<CateringEvent, "people" | "kgPerPerson"> & {
+  event: Pick<CateringEvent, "people" | "kgPerPerson" | "kgPerPersonBySource"> & {
     serviceType?: EventServiceType;
   },
   products: Product[],
@@ -61,9 +61,14 @@ export function calculateEventNeeds(
       }
 
       const defaultGroupKg = rule.kgPerPerson ?? recipe.kgPerPerson;
-      const groupKgPerPerson = event.kgPerPerson != null
-        ? defaultGroupKg * (effectiveKgPerPerson / recipe.kgPerPerson)
-        : defaultGroupKg;
+      let groupKgPerPerson: number;
+      if (rule.source && event.kgPerPersonBySource?.[rule.source] != null) {
+        groupKgPerPerson = event.kgPerPersonBySource[rule.source]!;
+      } else if (event.kgPerPerson != null) {
+        groupKgPerPerson = defaultGroupKg * (effectiveKgPerPerson / recipe.kgPerPerson);
+      } else {
+        groupKgPerPerson = defaultGroupKg;
+      }
       const groupShareTotal =
         recipeShareTotals[getRecipeRuleGroupKey(rule.source, rule.kgPerPerson)] ??
         100;
@@ -230,6 +235,27 @@ export function getDefaultKgPerPerson(serviceType?: EventServiceType): number {
   const recipe =
     recipeConfigs.find((item) => item.id === serviceType) ?? recipeConfigs[0];
   return recipe.kgPerPerson;
+}
+
+export type RecipeGroup = {
+  source: string;
+  kgPerPerson: number;
+};
+
+export function getRecipeGroups(serviceType?: EventServiceType): RecipeGroup[] {
+  const recipe =
+    recipeConfigs.find((item) => item.id === serviceType) ?? recipeConfigs[0];
+  const seen = new Map<string, number>();
+  for (const rule of recipe.rules) {
+    const src = rule.source ?? "";
+    if (!seen.has(src)) {
+      seen.set(src, rule.kgPerPerson ?? recipe.kgPerPerson);
+    }
+  }
+  return Array.from(seen.entries()).map(([source, kgPerPerson]) => ({
+    source,
+    kgPerPerson,
+  }));
 }
 
 export function formatEventDate(date: string): string {

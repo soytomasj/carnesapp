@@ -36,6 +36,7 @@ export type CateringEvent = {
   status: EventStatus;
   serviceType: EventServiceType;
   kgPerPerson?: number;
+  kgPerPersonBySource?: Record<string, number>;
 };
 
 export type ConsumptionRule = {
@@ -160,48 +161,48 @@ export const recipeConfigs: RecipeConfig[] = [
   {
     id: "espeto",
     name: "Catering asado",
-    kgPerPerson: 0.45,
+    kgPerPerson: 0.65,
     rules: [
       {
         productId: "costilla",
         share: 35,
-        kgPerPerson: 0.5,
+        kgPerPerson: 0.45,
         source: "Catering asado",
       },
       {
         productId: "vacio",
         share: 25,
-        kgPerPerson: 0.5,
+        kgPerPerson: 0.45,
         source: "Catering asado",
       },
       {
         productId: "bondiola",
         share: 15,
-        kgPerPerson: 0.5,
+        kgPerPerson: 0.45,
         source: "Catering asado",
       },
       {
         productId: "cupin",
         share: 15,
-        kgPerPerson: 0.5,
+        kgPerPerson: 0.45,
         source: "Catering asado",
       },
       {
         productId: "tapa-cuadril",
         share: 4,
-        kgPerPerson: 0.5,
+        kgPerPerson: 0.45,
         source: "Catering asado",
       },
       {
         productId: "colita-cuadril",
         share: 3,
-        kgPerPerson: 0.5,
+        kgPerPerson: 0.45,
         source: "Catering asado",
       },
       {
         productId: "muslo-pollo",
         share: 3,
-        kgPerPerson: 0.5,
+        kgPerPerson: 0.45,
         source: "Catering asado",
       },
       {

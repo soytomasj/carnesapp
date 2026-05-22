@@ -46,7 +46,7 @@ button:not(:disabled):active,
 }
 
 .section-content {
-  view-transition-name: section-content;
+  animation: app-section-enter 200ms ease both;
 }
 
 .app-card-enter {
@@ -446,13 +446,6 @@ select.field-control {
   }
 }
 
-::view-transition-old(section-content) {
-  animation: 180ms ease-out both app-section-exit;
-}
-
-::view-transition-new(section-content) {
-  animation: 240ms ease-in both app-section-enter;
-}
 
 @media (prefers-reduced-motion: reduce) {
   *,

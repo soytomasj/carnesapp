@@ -187,132 +187,165 @@ export function EventProductTable({
         </thead>
         <tbody>
           {(() => {
-            const needGroups = [
-              {
-                id: "frigorifico",
-                label: "Frigorífico",
-                icon: Refrigerator,
-                needs: needs.filter(
-                  (n) =>
-                    n.product.category === "Carnes" ||
-                    n.product.category === "Embutidos",
-                ),
-              },
-              {
-                id: "despensa",
-                label: "Despensa",
-                icon: Utensils,
-                needs: needs.filter((n) => n.product.category === "Despensa"),
-              },
-              {
-                id: "inventario",
-                label: "Inventario",
-                icon: ClipboardList,
-                needs: needs.filter(
-                  (n) => n.product.category === "Inventario",
-                ),
-              },
-            ].filter((g) => g.needs.length > 0);
-            const hasMultipleGroups = needGroups.length > 1;
-            return needGroups.map((group) => {
-              const GroupIcon = group.icon;
+            const sourcesMap = new Map<string | undefined, EventNeed[]>();
+            for (const need of needs) {
+              const key = need.source;
+              if (!sourcesMap.has(key)) sourcesMap.set(key, []);
+              sourcesMap.get(key)!.push(need);
+            }
+            const sourceGroups = [
+              ...[...sourcesMap.entries()].filter(([k]) => k !== undefined),
+              ...[...sourcesMap.entries()].filter(([k]) => k === undefined),
+            ].map(([source, sourceNeeds]) => ({ source, sourceNeeds }));
+            const hasMultipleSources =
+              sourceGroups.filter((g) => g.source !== undefined).length > 1;
+
+            return sourceGroups.map(({ source, sourceNeeds }) => {
+              const categoryGroups = [
+                {
+                  id: "frigorifico",
+                  label: "Frigorífico",
+                  icon: Refrigerator,
+                  needs: sourceNeeds.filter(
+                    (n) =>
+                      n.product.category === "Carnes" ||
+                      n.product.category === "Embutidos",
+                  ),
+                },
+                {
+                  id: "despensa",
+                  label: "Despensa",
+                  icon: Utensils,
+                  needs: sourceNeeds.filter(
+                    (n) => n.product.category === "Despensa",
+                  ),
+                },
+                {
+                  id: "inventario",
+                  label: "Inventario",
+                  icon: ClipboardList,
+                  needs: sourceNeeds.filter(
+                    (n) => n.product.category === "Inventario",
+                  ),
+                },
+              ].filter((g) => g.needs.length > 0);
+              const hasMultipleCategories = categoryGroups.length > 1;
+
               return (
-                <Fragment key={group.id}>
-                  {hasMultipleGroups && (
+                <Fragment key={source ?? "__extras__"}>
+                  {hasMultipleSources && source && (
                     <tr>
-                      <td colSpan={7} className="bg-zinc-50 px-3 py-3">
-                        <div className="flex items-center gap-2">
-                          <GroupIcon
-                            className="h-4 w-4 text-zinc-500"
-                            aria-hidden="true"
-                          />
-                          <p className="text-xs font-bold uppercase text-zinc-700">
-                            {group.label}
-                          </p>
-                        </div>
+                      <td colSpan={7} className="bg-zinc-100 px-3 py-2.5">
+                        <p className="text-xs font-bold uppercase tracking-widest text-zinc-900">
+                          {source}
+                        </p>
                       </td>
                     </tr>
                   )}
-                  {group.needs.map((need) => {
-                    const returnEntry = getDraftReturnEntry(
-                      need.product.id,
-                      returnLog,
-                    );
-                    const consumed = clampAmount(
-                      Math.max(need.total - returnEntry.returned, 0),
-                    );
-                    const visual = getProductVisual(need.product);
-
+                  {categoryGroups.map((group) => {
+                    const GroupIcon = group.icon;
                     return (
-                      <tr key={need.product.id}>
-                        <td className="w-[30%] border-b border-zinc-100 py-3">
-                          <div className="flex items-center gap-3">
-                            <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-[8px] bg-zinc-100 text-[#8f2f2b]">
-                              {visual.type === "image" ? (
-                                <Image
-                                  src={visual.src}
-                                  alt={visual.alt}
-                                  width={24}
-                                  height={24}
-                                  className="h-6 w-6 object-contain"
-                                />
-                              ) : (
-                                <visual.Icon
-                                  className="h-4 w-4"
+                      <Fragment key={group.id}>
+                        {(hasMultipleCategories || hasMultipleSources) && (
+                          <tr>
+                            <td colSpan={7} className="bg-zinc-50 px-3 py-3">
+                              <div className="flex items-center gap-2">
+                                <GroupIcon
+                                  className="h-4 w-4 text-zinc-500"
                                   aria-hidden="true"
                                 />
-                              )}
-                            </div>
-                            <div className="min-w-0">
-                              <p className="truncate font-semibold text-zinc-950">
-                                {need.product.name}
-                              </p>
-                              <p className="mt-1 text-xs font-medium text-zinc-500">
-                                {need.share
-                                  ? `${formatShare(need.share)}%`
-                                  : "Por persona"}
-                              </p>
-                            </div>
-                          </div>
-                        </td>
-                        <td className="w-[14%] border-b border-zinc-100 py-3 text-center text-zinc-600">
-                          {need.source ?? serviceLabel}
-                        </td>
-                        <td className="w-[13%] border-b border-zinc-100 py-3 text-center text-zinc-700">
-                          {formatAmount(
-                            need.base + need.preventive,
-                            need.product.unit,
-                          )}
-                        </td>
-                        <td className="w-[13%] border-b border-zinc-100 py-3">
-                          <QuantityInput
-                            ariaLabel={`Cantidad a llevar de ${need.product.name}`}
-                            value={need.total}
-                            onChange={(value) => onUpdatePlan(need, value)}
-                          />
-                        </td>
-                        <td className="w-[13%] border-b border-zinc-100 py-3">
-                          <QuantityInput
-                            ariaLabel={`Cantidad que volvió de ${need.product.name}`}
-                            value={returnEntry.returned}
-                            onChange={(value) => onUpdateReturn(need, value)}
-                          />
-                        </td>
-                        <td className="w-[13%] border-b border-zinc-100 py-3 text-center font-semibold text-zinc-950">
-                          {formatAmount(consumed, need.product.unit)}
-                        </td>
-                        <td className="w-[4%] border-b border-zinc-100 py-3 text-right">
-                          <button
-                            type="button"
-                            onClick={() => onRemoveProduct(need.product.id)}
-                            className="inline-flex h-8 w-8 items-center justify-center rounded-[8px] text-zinc-400 transition hover:bg-red-50 hover:text-red-700"
-                            aria-label={`Quitar ${need.product.name} del evento`}
-                            title="Quitar producto"
-                          >
-                            <Trash2 className="h-4 w-4" aria-hidden="true" />
-                          </button>
-                        </td>
-                      </tr>
+                                <p className="text-xs font-bold uppercase text-zinc-700">
+                                  {group.label}
+                                </p>
+                              </div>
+                            </td>
+                          </tr>
+                        )}
+                        {group.needs.map((need) => {
+                          const returnEntry = getDraftReturnEntry(
+                            need.product.id,
+                            returnLog,
+                          );
+                          const consumed = clampAmount(
+                            Math.max(need.total - returnEntry.returned, 0),
+                          );
+                          const visual = getProductVisual(need.product);
+
+                          return (
+                            <tr key={need.product.id}>
+                              <td className="w-[30%] border-b border-zinc-100 py-3">
+                                <div className="flex items-center gap-3">
+                                  <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-[8px] bg-zinc-100 text-[#8f2f2b]">
+                                    {visual.type === "image" ? (
+                                      <Image
+                                        src={visual.src}
+                                        alt={visual.alt}
+                                        width={24}
+                                        height={24}
+                                        className="h-6 w-6 object-contain"
+                                      />
+                                    ) : (
+                                      <visual.Icon
+                                        className="h-4 w-4"
+                                        aria-hidden="true"
+                                      />
+                                    )}
+                                  </div>
+                                  <div className="min-w-0">
+                                    <p className="truncate font-semibold text-zinc-950">
+                                      {need.product.name}
+                                    </p>
+                                    <p className="mt-1 text-xs font-medium text-zinc-500">
+                                      {need.share
+                                        ? `${formatShare(need.share)}%`
+                                        : "Por persona"}
+                                    </p>
+                                  </div>
+                                </div>
+                              </td>
+                              <td className="w-[14%] border-b border-zinc-100 py-3 text-center text-zinc-600">
+                                {need.source ?? serviceLabel}
+                              </td>
+                              <td className="w-[13%] border-b border-zinc-100 py-3 text-center text-zinc-700">
+                                {formatAmount(
+                                  need.base + need.preventive,
+                                  need.product.unit,
+                                )}
+                              </td>
+                              <td className="w-[13%] border-b border-zinc-100 py-3">
+                                <QuantityInput
+                                  ariaLabel={`Cantidad a llevar de ${need.product.name}`}
+                                  value={need.total}
+                                  onChange={(value) => onUpdatePlan(need, value)}
+                                />
+                              </td>
+                              <td className="w-[13%] border-b border-zinc-100 py-3">
+                                <QuantityInput
+                                  ariaLabel={`Cantidad que volvió de ${need.product.name}`}
+                                  value={returnEntry.returned}
+                                  onChange={(value) =>
+                                    onUpdateReturn(need, value)
+                                  }
+                                />
+                              </td>
+                              <td className="w-[13%] border-b border-zinc-100 py-3 text-center font-semibold text-zinc-950">
+                                {formatAmount(consumed, need.product.unit)}
+                              </td>
+                              <td className="w-[4%] border-b border-zinc-100 py-3 text-right">
+                                <button
+                                  type="button"
+                                  onClick={() => onRemoveProduct(need.product.id)}
+                                  className="inline-flex h-8 w-8 items-center justify-center rounded-[8px] text-zinc-400 transition hover:bg-red-50 hover:text-red-700"
+                                  aria-label={`Quitar ${need.product.name} del evento`}
+                                  title="Quitar producto"
+                                >
+                                  <Trash2 className="h-4 w-4" aria-hidden="true" />
+                                </button>
+                              </td>
+                            </tr>
+                          );
+                        })}
+                      </Fragment>
                     );
                   })}
                 </Fragment>
