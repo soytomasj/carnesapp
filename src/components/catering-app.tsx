@@ -48,7 +48,7 @@ export default function CateringApp() {
     visibleProducts,
   } = useCateringApp();
 
-  function handleSectionChange(section: string) {
+  function handleSectionChange(section: Section) {
     if (section === activeSection) return;
     setActiveSection(section);
     window.scrollTo(0, 0);
