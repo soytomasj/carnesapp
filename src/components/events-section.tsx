@@ -217,19 +217,19 @@ export function EventsSection({
   const addableProducts = products.filter(
     (product) => !selectedProductIds.has(product.id),
   );
+  const isMeatNeed = (need: { product: { category: string } }) =>
+    need.product.category === "Carnes" || need.product.category === "Embutidos";
   const detailEstimatedConsumptionTotal = detailEvent
     ? clampAmount(
         detailNeeds.reduce(
-          (total, need) =>
-            need.product.unit === "kg" ? total + need.base : total,
+          (total, need) => (isMeatNeed(need) ? total + need.base : total),
           0,
         ),
       )
     : 0;
   const detailSentTotal = clampAmount(
     detailNeeds.reduce(
-      (total, need) =>
-        need.product.unit === "kg" ? total + need.total : total,
+      (total, need) => (isMeatNeed(need) ? total + need.total : total),
       0,
     ),
   );
@@ -237,7 +237,7 @@ export function EventsSection({
     ? clampAmount(
         detailNeeds.reduce(
           (total, need) =>
-            need.product.unit === "kg"
+            isMeatNeed(need)
               ? total +
                 getDraftReturnEntry(need.product.id, draftReturnLog).returned
               : total,

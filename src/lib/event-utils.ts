@@ -276,7 +276,7 @@ export function getEventNeedsWhatsappUrl(event: CateringEvent, needs: EventNeed[
     `${icons.box} *Lista para sacar y preparar:*`,
     needsText,
     "",
-    "Confirmame si ajustamos alguna cantidad.",
+    "Aguardo confirmación de las cantidades exactas que se llevan al evento.",
   ]
     .filter((line) => line !== null)
     .join("\n");
