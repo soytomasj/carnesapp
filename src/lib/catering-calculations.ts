@@ -1,5 +1,4 @@
 import {
-  PREVENTIVE_RATE,
   type CateringEvent,
   type EventServiceType,
   type EventReturnLog,
@@ -186,8 +185,8 @@ function buildNeed(
   source?: string,
 ): EventNeed {
   const base = roundOperationalAmount(rawBase);
-  const total = roundOperationalAmount(base * (1 + PREVENTIVE_RATE));
-  const preventive = roundAmount(Math.max(total - base, 0));
+  const total = base;
+  const preventive = 0;
 
   return {
     product,
