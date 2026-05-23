@@ -80,6 +80,9 @@ export default function CateringApp() {
               nextEvent={nextEvent}
               nextPreparationTotal={nextPreparationTotal}
               stockTotal={stockTotal}
+              events={events}
+              stockMovements={stockMovements}
+              meatProductIds={fridgeProducts.map((p) => p.id)}
             />
           )}
 

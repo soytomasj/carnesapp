@@ -584,7 +584,6 @@ export function FridgeSection({
           onSetManualProductStock={onSetManualProductStock}
           product={detailProduct}
           reservedEntries={reservedEntriesByProduct[detailProduct.id] ?? []}
-          reservedStock={reservedStockByProduct[detailProduct.id] ?? 0}
         />
       )}
     </div>

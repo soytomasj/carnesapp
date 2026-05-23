@@ -1,5 +1,10 @@
 import CateringApp from "@/components/catering-app";
+import { LoginGate } from "@/components/login-gate";
 
 export default function Home() {
-  return <CateringApp />;
+  return (
+    <LoginGate>
+      <CateringApp />
+    </LoginGate>
+  );
 }
