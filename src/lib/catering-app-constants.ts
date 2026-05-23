@@ -1,4 +1,5 @@
 import {
+  Beef,
   CalendarDays,
   ChefHat,
   ClipboardList,
@@ -7,9 +8,17 @@ import {
   PackageCheck,
   PackagePlus,
   Refrigerator,
+  Scale,
   ShoppingCart,
   Utensils,
 } from "lucide-react";
+
+export const ICONS = {
+  frigorifico: Beef,
+  reservado: PackageCheck,
+  disponible: Scale,
+  cocinado: Flame,
+} as const;
 import {
   type EventServiceType,
   type EventStatus,

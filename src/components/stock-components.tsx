@@ -8,6 +8,7 @@ import {
   Scale,
   Trash2,
 } from "lucide-react";
+import { ICONS } from "@/lib/catering-app-constants";
 import type { CateringEvent, Product, ProductUnit } from "@/lib/catering-data";
 import type { StockMovement, StockReservationEntry } from "@/lib/catering-types";
 import { formatAmount, formatEventDate } from "@/lib/catering-calculations";
@@ -89,7 +90,7 @@ export function StockTableRow({
       </td>
       <td className="w-24 border-b border-zinc-100 py-3 text-center">
         <span className="inline-flex items-center gap-1.5 rounded-[8px] border border-zinc-200 bg-zinc-50 px-2 py-1.5 text-sm font-semibold text-zinc-950">
-          <Scale className="h-3 w-3 text-zinc-500" aria-hidden="true" />
+          <ICONS.frigorifico className="h-3 w-3 text-zinc-500" aria-hidden="true" />
           {formatAmount(product.currentStock, product.unit)}
         </span>
       </td>

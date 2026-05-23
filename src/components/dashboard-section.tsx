@@ -8,13 +8,13 @@ import {
   ChevronLeft,
   ChevronRight,
   Flame,
-  Scale,
   Trophy,
   Truck,
   Users,
 } from "lucide-react";
 import type { CateringEvent } from "@/lib/catering-data";
 import type { StockMovement } from "@/lib/catering-types";
+import { ICONS } from "@/lib/catering-app-constants";
 import {
   formatAmount,
   formatEventDate,
@@ -250,19 +250,19 @@ export function DashboardSection({
             tone="bg-[#edf7f1] text-[#2f6b4f]"
           />
           <StatCard
-            icon={Scale}
-            label="Stock disponible"
+            icon={ICONS.frigorifico}
+            label="Carne en frigorífico"
             value={roundAmount(stockTotal).toLocaleString("es-PY", {
               maximumFractionDigits: 1,
             })}
-            detail="Stock total en kg"
+            detail="Stock total disponible en kg"
             tone="bg-zinc-100 text-zinc-700"
           />
           <StatCard
-            icon={AlertTriangle}
-            label="Kg a preparar"
+            icon={ICONS.reservado}
+            label="Carne reservada"
             value={formatAmount(nextPreparationTotal, "kg")}
-            detail="Para el próximo evento"
+            detail="A preparar para el próximo evento"
             tone="bg-zinc-100 text-[#a35612]"
           />
           <StatCard
